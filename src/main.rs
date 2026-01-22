@@ -7,6 +7,7 @@ pub mod templates;
 pub mod markdown;
 pub mod ui;
 pub mod storage;
+pub mod rich_text_editor;
 
 fn main() {
     logger::init();

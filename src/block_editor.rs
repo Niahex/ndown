@@ -4,7 +4,7 @@ use crate::editor_state::EditorState;
 use crate::ui::{EventHandler, BlockRenderer};
 use crate::storage::{Storage, LocalStorage};
 use crate::ui::components::inline_formatter::InlineFormatter;
-use crate::ui::components::rich_text_editor::RichTextEditor;
+use crate::rich_text_editor::RichTextEditor;
 use std::path::PathBuf;
 
 live_design! {
