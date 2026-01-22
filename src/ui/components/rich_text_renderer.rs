@@ -1,5 +1,5 @@
 use makepad_widgets::*;
-use crate::markdown::inline::{parse_inline_formatting, InlineFormat, extract_plain_text};
+use crate::markdown::inline::{parse_inline_formatting, InlineFormat};
 
 pub struct RichTextRenderer;
 
@@ -16,7 +16,7 @@ impl RichTextRenderer {
             }
             
             // Render the formatted span
-            let content = match span.format {
+            let _content = match span.format {
                 InlineFormat::Bold => {
                     tf.bold.push();
                     let content = &text[span.range.start + 2..span.range.end - 2];

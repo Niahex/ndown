@@ -4,6 +4,7 @@ use crate::editor_state::EditorState;
 use crate::ui::{EventHandler, BlockRenderer};
 use crate::storage::{Storage, LocalStorage};
 use crate::ui::components::inline_formatter::InlineFormatter;
+use crate::ui::components::rich_text_editor::RichTextEditor;
 use std::path::PathBuf;
 
 live_design! {
@@ -151,6 +152,9 @@ live_design! {
         BlockInputInactiveList = <BlockInputInactiveList> {}
         BlockInputOrderedList = <BlockInputOrderedList> {}
         BlockInputInactiveOrderedList = <BlockInputInactiveOrderedList> {}
+        
+        // Rich text editor for active blocks
+        RichBlockEditor = <RichTextEditorBase> {}
     }
 }
 

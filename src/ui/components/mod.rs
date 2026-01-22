@@ -3,5 +3,6 @@ pub mod indentation;
 pub mod ordered_list;
 pub mod inline_formatter;
 pub mod rich_text_renderer;
+pub mod rich_text_editor;
 
 pub use block_renderer::*;
