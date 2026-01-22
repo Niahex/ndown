@@ -1,8 +1,7 @@
 use makepad_widgets::*;
 use makepad_widgets::text_input::TextInputAction;
-use makepad_draw::text::selection::Cursor;
 use crate::editor_state::EditorState;
-use crate::block::BlockType;
+use crate::ui::{EventHandler, BlockRenderer};
 
 live_design! {
     use link::theme::*;
@@ -10,8 +9,7 @@ live_design! {
     use link::widgets::*;
     
     BlockLabelBase = <Label> {
-        width: Fill
-        padding: 10
+        width: Fill, padding: 10
         draw_text: {
             text_style: <THEME_FONT_REGULAR> {font_size: 14}
             color: #cccccc
@@ -19,12 +17,8 @@ live_design! {
     }
     
     BlockInputBase = <TextInput> {
-        width: Fill
-        height: Fit
-        padding: 10
-        draw_bg: {
-            color: #2a2a2a
-        }
+        width: Fill, height: Fit, padding: 10
+        draw_bg: { color: #2a2a2a }
         draw_text: {
             text_style: <THEME_FONT_REGULAR> {font_size: 14}
             color: #ffffff
@@ -32,52 +26,36 @@ live_design! {
     }
     
     BlockInputH1 = <TextInput> {
-        width: Fill
-        height: Fit
-        padding: 10
-        draw_bg: {
-            color: #2a2a2a
-        }
+        width: Fill, height: Fit, padding: 10
+        draw_bg: { color: #2a2a2a }
         draw_text: {
-            text_style: <THEME_FONT_REGULAR> {font_size: 25}  // 1.8 * 14
+            text_style: <THEME_FONT_REGULAR> {font_size: 25}
             color: #ffffff
         }
     }
     
     BlockInputH2 = <TextInput> {
-        width: Fill
-        height: Fit
-        padding: 10
-        draw_bg: {
-            color: #2a2a2a
-        }
+        width: Fill, height: Fit, padding: 10
+        draw_bg: { color: #2a2a2a }
         draw_text: {
-            text_style: <THEME_FONT_REGULAR> {font_size: 21}  // 1.5 * 14
+            text_style: <THEME_FONT_REGULAR> {font_size: 21}
             color: #ffffff
         }
     }
     
     BlockInputH3 = <TextInput> {
-        width: Fill
-        height: Fit
-        padding: 10
-        draw_bg: {
-            color: #2a2a2a
-        }
+        width: Fill, height: Fit, padding: 10
+        draw_bg: { color: #2a2a2a }
         draw_text: {
-            text_style: <THEME_FONT_REGULAR> {font_size: 18}  // 1.3 * 14
+            text_style: <THEME_FONT_REGULAR> {font_size: 18}
             color: #ffffff
         }
     }
     
     BlockInputInactive = <TextInput> {
-        width: Fill
-        height: Fit
-        padding: 10
+        width: Fill, height: Fit, padding: 10
         is_read_only: true
-        draw_bg: {
-            color: #1a1a1a
-        }
+        draw_bg: { color: #1a1a1a }
         draw_text: {
             text_style: <THEME_FONT_REGULAR> {font_size: 14}
             color: #cccccc
@@ -85,13 +63,9 @@ live_design! {
     }
     
     BlockInputInactiveH1 = <TextInput> {
-        width: Fill
-        height: Fit
-        padding: 10
+        width: Fill, height: Fit, padding: 10
         is_read_only: true
-        draw_bg: {
-            color: #1a1a1a
-        }
+        draw_bg: { color: #1a1a1a }
         draw_text: {
             text_style: <THEME_FONT_REGULAR> {font_size: 25}
             color: #cccccc
@@ -99,13 +73,9 @@ live_design! {
     }
     
     BlockInputInactiveH2 = <TextInput> {
-        width: Fill
-        height: Fit
-        padding: 10
+        width: Fill, height: Fit, padding: 10
         is_read_only: true
-        draw_bg: {
-            color: #1a1a1a
-        }
+        draw_bg: { color: #1a1a1a }
         draw_text: {
             text_style: <THEME_FONT_REGULAR> {font_size: 21}
             color: #cccccc
@@ -113,13 +83,9 @@ live_design! {
     }
     
     BlockInputInactiveH3 = <TextInput> {
-        width: Fill
-        height: Fit
-        padding: 10
+        width: Fill, height: Fit, padding: 10
         is_read_only: true
-        draw_bg: {
-            color: #1a1a1a
-        }
+        draw_bg: { color: #1a1a1a }
         draw_text: {
             text_style: <THEME_FONT_REGULAR> {font_size: 18}
             color: #cccccc
@@ -128,8 +94,7 @@ live_design! {
     
     pub BlockEditor = {{BlockEditor}} {
         width: Fill, height: Fill
-        flow: Down
-        spacing: 5
+        flow: Down, spacing: 5
         
         BlockLabel = <BlockLabelBase> {}
         BlockInput = <BlockInputBase> {}
@@ -149,121 +114,47 @@ pub struct BlockEditor {
     #[layout] layout: Layout,
     #[redraw] #[rust] area: Area,
     #[rust] pub editor_state: EditorState,
-    #[rust] templates: ComponentMap<LiveId, LivePtr>,
-    #[rust] items: ComponentMap<usize, WidgetRef>,
+    #[rust] renderer: BlockRenderer,
+    #[rust] event_handler: EventHandler,
 }
 
 impl LiveHook for BlockEditor {
     fn before_apply(&mut self, _cx: &mut Cx, apply: &mut Apply, _index: usize, _nodes: &[LiveNode]) {
         if let ApplyFrom::UpdateFromDoc {..} = apply.from {
-            self.templates.clear();
+            self.renderer.clear_templates();
         }
-        ::log::info!("BlockEditor before_apply called");
     }
     
     fn apply_value_instance(&mut self, cx: &mut Cx, apply: &mut Apply, index: usize, nodes: &[LiveNode]) -> usize {
-        ::log::info!("BlockEditor apply_value_instance called for node: {:?}", nodes[index].id);
-        
         if nodes[index].is_instance_prop() {
             if let Some(live_ptr) = apply.from.to_live_ptr(cx, index){
                 let id = nodes[index].id;
-                ::log::info!("Registering template: {:?} -> {:?}", id, live_ptr);
-                self.templates.insert(id, live_ptr);
+                self.renderer.register_template(id, live_ptr);
             }
         }
         nodes.skip_node(index)
     }
 }
 
-impl BlockEditor {
-    fn detect_heading_level(content: &str) -> Option<u8> {
-        let trimmed = content.trim_start();
-        if trimmed.starts_with("### ") {
-            Some(3)
-        } else if trimmed.starts_with("## ") {
-            Some(2)
-        } else if trimmed.starts_with("# ") {
-            Some(1)
-        } else {
-            None
-        }
-    }
-    
-    fn get_template_for_block(content: &str, is_active: bool) -> LiveId {
-        match Self::detect_heading_level(content) {
-            Some(1) => if is_active { live_id!(BlockInputH1) } else { live_id!(BlockInputInactiveH1) },
-            Some(2) => if is_active { live_id!(BlockInputH2) } else { live_id!(BlockInputInactiveH2) },
-            Some(3) => if is_active { live_id!(BlockInputH3) } else { live_id!(BlockInputInactiveH3) },
-            _ => if is_active { live_id!(BlockInput) } else { live_id!(BlockInputInactive) },
-        }
-    }
-}
-
 impl Widget for BlockEditor {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
-        let mut navigation_target: Option<usize> = None;
-        let mut should_delete_block = false;
-        let mut blocks_to_recreate = Vec::new();
+        self.event_handler = EventHandler::new();
         
-        // Handle events for all items normally - let TextInputs handle their own clicks
-        for (block_id, item) in self.items.iter_mut() {
+        // Handle events for all items
+        for (block_id, item) in self.renderer.items_iter_mut() {
             let block_id = *block_id;
             
             for action in cx.capture_actions(|cx| item.handle_event(cx, event, scope)) {
                 if let Some(action) = action.as_widget_action() {
                     match action.cast() {
                         TextInputAction::Changed(text) => {
-                            if let Some(block) = self.editor_state.blocks_mut().get_mut(block_id) {
-                                let old_content = block.content.clone();
-                                block.content = text.clone();
-                                
-                                // Check if heading level changed - if so, recreate widget
-                                let old_level = Self::detect_heading_level(&old_content);
-                                let new_level = Self::detect_heading_level(&text);
-                                
-                                if old_level != new_level {
-                                    blocks_to_recreate.push(block_id);
-                                }
-                            }
+                            self.event_handler.handle_text_changed(block_id, text, &mut self.editor_state);
                         }
                         TextInputAction::KeyFocus => {
-                            // When a TextInput gets focus, make it the active block
-                            let old_active = self.editor_state.active_block_index();
-                            if block_id != old_active {
-                                self.editor_state.set_active_block(block_id);
-                                self.items.remove(&old_active);
-                                self.items.remove(&block_id);
-                                cx.redraw_all();
-                                return;
-                            } else {
-                                // Same block getting focus - position cursor at end
-                                let text_input = item.as_text_input();
-                                let text_len = text_input.text().len();
-                                text_input.set_cursor(cx, Cursor {
-                                    index: text_len,
-                                    prefer_next_row: false,
-                                }, false);
-                                item.redraw(cx);
-                            }
+                            self.event_handler.handle_key_focus(block_id, &mut self.editor_state, item, cx);
                         }
                         TextInputAction::KeyDownUnhandled(ke) => {
-                            match ke.key_code {
-                                KeyCode::ArrowUp if block_id > 0 => {
-                                    navigation_target = Some(block_id - 1);
-                                }
-                                KeyCode::ArrowDown if block_id < self.editor_state.blocks().len() - 1 => {
-                                    navigation_target = Some(block_id + 1);
-                                }
-                                KeyCode::Backspace if block_id > 0 && self.editor_state.blocks().len() > 1 => {
-                                    if let Some(block) = self.editor_state.blocks().get(block_id) {
-                                        if block.content.is_empty() {
-                                            should_delete_block = true;
-                                            navigation_target = Some(block_id - 1);
-                                        }
-                                    }
-                                }
-                                _ => {}
-                            }
+                            self.event_handler.handle_navigation(block_id, ke.key_code, &self.editor_state);
                         }
                         _ => {}
                     }
@@ -271,28 +162,28 @@ impl Widget for BlockEditor {
             }
         }
         
-        // Remove blocks that need to be recreated
-        for block_id in blocks_to_recreate {
-            self.items.remove(&block_id);
+        // Apply changes
+        for block_id in &self.event_handler.blocks_to_recreate {
+            self.renderer.remove_item(block_id);
         }
         
-        if should_delete_block {
+        if self.event_handler.should_delete_block {
             let active_index = self.editor_state.active_block_index();
             self.editor_state.delete_block(active_index);
-            self.items.clear();
+            self.renderer.clear_items();
             cx.redraw_all();
             return;
         }
         
-        if let Some(new_active) = navigation_target {
+        if let Some(new_active) = self.event_handler.navigation_target {
             let old_active = self.editor_state.active_block_index();
             self.editor_state.set_active_block(new_active);
-            self.items.remove(&old_active);
-            self.items.remove(&new_active);
+            self.renderer.remove_item(&old_active);
+            self.renderer.remove_item(&new_active);
             cx.redraw_all();
         }
         
-        // Handle keyboard shortcuts
+        // Handle global shortcuts
         if let Event::KeyDown(ke) = event {
             match ke.key_code {
                 KeyCode::ReturnKey if !ke.modifiers.shift => {
@@ -302,54 +193,10 @@ impl Widget for BlockEditor {
                     self.editor_state.create_block(new_index, crate::block::Block::text(String::new()));
                     self.editor_state.set_active_block(new_index);
                     
-                    // Remove old active and new active so they get recreated with correct templates
-                    self.items.remove(&old_active);
-                    self.items.remove(&new_index);
-                    
+                    self.renderer.remove_item(&old_active);
+                    self.renderer.remove_item(&new_index);
                     cx.redraw_all();
                 }
-                
-                // Ctrl+Home: go to first block
-                KeyCode::Home if ke.modifiers.control => {
-                    let old_active = self.editor_state.active_block_index();
-                    self.editor_state.set_active_block(0);
-                    self.items.remove(&old_active);
-                    self.items.remove(&0);
-                    cx.redraw_all();
-                }
-                
-                // Ctrl+End: go to last block
-                KeyCode::End if ke.modifiers.control => {
-                    let old_active = self.editor_state.active_block_index();
-                    let last_index = self.editor_state.blocks().len().saturating_sub(1);
-                    self.editor_state.set_active_block(last_index);
-                    self.items.remove(&old_active);
-                    self.items.remove(&last_index);
-                    cx.redraw_all();
-                }
-                
-                // Page Up: go to previous block
-                KeyCode::PageUp => {
-                    let active_index = self.editor_state.active_block_index();
-                    if active_index > 0 {
-                        self.editor_state.set_active_block(active_index - 1);
-                        self.items.remove(&active_index);
-                        self.items.remove(&(active_index - 1));
-                        cx.redraw_all();
-                    }
-                }
-                
-                // Page Down: go to next block
-                KeyCode::PageDown => {
-                    let active_index = self.editor_state.active_block_index();
-                    if active_index < self.editor_state.blocks().len() - 1 {
-                        self.editor_state.set_active_block(active_index + 1);
-                        self.items.remove(&active_index);
-                        self.items.remove(&(active_index + 1));
-                        cx.redraw_all();
-                    }
-                }
-                
                 _ => {}
             }
         }
@@ -358,53 +205,11 @@ impl Widget for BlockEditor {
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
         cx.begin_turtle(walk, self.layout);
         
-        ::log::debug!("BlockEditor draw_walk: {} blocks, {} templates, {} items", 
-            self.editor_state.blocks().len(),
-            self.templates.len(),
-            self.items.len()
-        );
-        
         let active_index = self.editor_state.active_block_index();
         
-        // First pass: create/update all widgets
         for (index, block) in self.editor_state.blocks().iter().enumerate() {
             let is_active = index == active_index;
-            
-            let content = match &block.block_type {
-                BlockType::Text => block.content.clone(),
-                BlockType::Heading(level) => {
-                    format!("{} {}", "#".repeat(*level as usize), block.content)
-                }
-            };
-            
-            let template_id = Self::get_template_for_block(&content, is_active);
-            
-            // Get or create widget for this block
-            if !self.items.contains_key(&index) {
-                if let Some(ptr) = self.templates.get(&template_id) {
-                    let widget = WidgetRef::new_from_ptr(cx, Some(*ptr));
-                    self.items.insert(index, widget);
-                } else {
-                    ::log::warn!("Template {:?} not found!", template_id);
-                }
-            }
-            
-            // Set text content
-            if let Some(item) = self.items.get(&index) {
-                item.set_text(cx, &content);
-            }
-        }
-        
-        // Second pass: draw all widgets
-        for (index, _block) in self.editor_state.blocks().iter().enumerate() {
-            if let Some(item) = self.items.get_mut(&index) {
-                item.draw_walk(cx, scope, Walk::fill_fit())?;
-                
-                // Set focus on active block after drawing
-                if index == active_index {
-                    item.set_key_focus(cx);
-                }
-            }
+            let _ = self.renderer.render_block(cx, scope, index, block, is_active);
         }
         
         cx.end_turtle_with_area(&mut self.area);
