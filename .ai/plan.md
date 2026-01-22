@@ -133,7 +133,14 @@ Architecture technique:
 - **Tests**: ✅ Créer/supprimer blocs, changer bloc actif
 - **Demo**: ✅ État en mémoire avec quelques blocs, affichage debug dans console
 
-Task 3: Affichage simple de blocs en mode texte
+✅ Task 3: Affichage simple de blocs en mode texte
+- ✅ Créer composant Makepad BlockView pour afficher un bloc
+- ✅ Implémenter rendu basique: bloc actif avec fond différent, autres blocs en texte simple
+- ✅ Afficher liste verticale de blocs
+- **Tests**: ✅ Afficher 3-5 blocs, identifier visuellement le bloc actif
+- **Demo**: ✅ Interface montrant plusieurs blocs texte, un surligné comme actif
+
+Task 4: Input clavier de base et création de blocs
 - Définir struct Block avec id, type, contenu, métadonnées
 - Créer enum BlockType pour types de base (Text, Heading)
 - Implémenter struct EditorState avec Vec de blocs et index bloc actif

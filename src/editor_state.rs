@@ -1,17 +1,23 @@
 use crate::block::Block;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct EditorState {
     blocks: Vec<Block>,
     active_block_index: usize,
 }
 
-impl EditorState {
-    pub fn new() -> Self {
+impl Default for EditorState {
+    fn default() -> Self {
         Self {
             blocks: vec![Block::text(String::new())],
             active_block_index: 0,
         }
+    }
+}
+
+impl EditorState {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn blocks(&self) -> &[Block] {
