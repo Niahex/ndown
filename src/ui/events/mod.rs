@@ -1,8 +1,9 @@
 use makepad_widgets::*;
 use makepad_draw::text::selection::Cursor;
 use crate::editor_state::EditorState;
-use crate::markdown::parser::{detect_heading_level, detect_list_item, is_list_item};
+use crate::markdown::parser::{detect_heading_level, detect_list_item, is_list_item, ListType};
 use crate::ui::components::indentation::IndentationManager;
+use crate::ui::components::ordered_list::OrderedListManager;
 use crate::block::BlockType;
 
 #[derive(Default)]
@@ -11,13 +12,16 @@ pub struct EventHandler {
     pub should_delete_block: bool,
     pub blocks_to_recreate: Vec<usize>,
     pub should_create_new_block: Option<(usize, String)>,
+    pub should_renumber_lists: Option<usize>,
     indent_manager: IndentationManager,
+    pub ordered_list_manager: OrderedListManager,
 }
 
 impl EventHandler {
     pub fn new() -> Self {
         Self {
             indent_manager: IndentationManager::new(),
+            ordered_list_manager: OrderedListManager::new(),
             ..Default::default()
         }
     }
@@ -105,17 +109,63 @@ impl EventHandler {
     }
 
     pub fn handle_tab_key(&mut self, block_id: usize, shift_pressed: bool, editor_state: &mut EditorState) -> bool {
-        if let Some(block) = editor_state.blocks_mut().get_mut(block_id) {
-            if is_list_item(&block.content) {
-                if shift_pressed {
-                    block.content = self.indent_manager.decrease_indent(&block.content);
+        // First, get the list info and previous main number before borrowing mutably
+        let (list_info, prev_main_num) = if let Some(block) = editor_state.blocks().get(block_id) {
+            if let Some(list_info) = detect_list_item(&block.content) {
+                let prev_main_num = if list_info.list_type == ListType::Ordered && !shift_pressed {
+                    self.find_previous_main_number(block_id, editor_state)
                 } else {
-                    block.content = self.indent_manager.increase_indent(&block.content);
+                    None
+                };
+                (list_info, prev_main_num)
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        };
+        
+        // Now handle the mutation
+        if let Some(block) = editor_state.blocks_mut().get_mut(block_id) {
+            match list_info.list_type {
+                ListType::Unordered => {
+                    if shift_pressed {
+                        block.content = self.indent_manager.decrease_indent(&block.content);
+                    } else {
+                        block.content = self.indent_manager.increase_indent(&block.content);
+                    }
+                    self.blocks_to_recreate.push(block_id);
+                    return true;
                 }
-                self.blocks_to_recreate.push(block_id);
-                return true;
+                ListType::Ordered => {
+                    // Tab/Shift+Tab disabled for ordered lists due to complexity
+                    // Will be implemented later
+                    return false;
+                }
             }
         }
         false
+    }
+    
+    fn find_previous_main_number(&self, block_id: usize, editor_state: &EditorState) -> Option<u32> {
+        // Look backwards for the previous main-level ordered list item
+        for i in (0..block_id).rev() {
+            if let Some(block) = editor_state.blocks().get(i) {
+                if let Some(list_info) = detect_list_item(&block.content) {
+                    if list_info.list_type == ListType::Ordered && list_info.indent_level == 0 {
+                        // Found previous main item, extract its number
+                        let trimmed = block.content.trim_start();
+                        if let Some(dot_pos) = trimmed.find('.') {
+                            if let Ok(num) = trimmed[..dot_pos].parse::<u32>() {
+                                return Some(num);
+                            }
+                        }
+                    }
+                } else {
+                    break; // Stop at non-list item
+                }
+            }
+        }
+        None
     }
 }

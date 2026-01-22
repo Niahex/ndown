@@ -41,8 +41,17 @@ impl IndentationManager {
         let indent = " ".repeat(list_info.indent_level * self.spaces_per_level);
         match list_info.list_type {
             ListType::Unordered => format!("{}{} ", indent, list_info.marker),
-            ListType::Ordered => format!("{}1. ", indent),
+            ListType::Ordered => {
+                // Extract current number and increment
+                let current_num = self.extract_number_from_marker(&list_info.marker);
+                format!("{}{}. ", indent, current_num + 1)
+            }
         }
+    }
+    
+    fn extract_number_from_marker(&self, _marker: &char) -> u32 {
+        // For now, always return 1 (will be enhanced later for proper numbering)
+        1
     }
 }
 

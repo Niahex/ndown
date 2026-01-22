@@ -206,14 +206,14 @@ Task 10: Raccourcis clavier pour formatage (Ctrl+B, Ctrl+I)
 - **Demo**: ✅ Listes à puces fonctionnelles avec comportements intelligents
 
 **Task 12: Listes numérotées et indentation**
-- Ajouter support listes numérotées (
-1. , 2.
-, etc.)
-- Implémenter Tab/Shift+Tab pour indentation (sous-listes)
-- Gérer numérotation automatique
-- Comportement puce/numéro vide identique aux puces
-- **Tests**: Listes numérotées, indentation multi-niveaux
-- **Demo**: Listes complexes avec sous-listes fonctionnelles
+- ✅ Ajouter support listes numérotées (1. , 2. , etc.)
+- ✅ Conversion automatique: taper 1.  transforme en liste numérotée
+- ✅ Auto-continuation: Enter crée nouvel item numéroté
+- ❌ Implémenter Tab/Shift+Tab pour indentation (complexité technique - reporté)
+- ❌ Gérer numérotation automatique hiérarchique (1.1, 1.2) - reporté
+- ❌ Comportement puce/numéro vide identique aux puces - reporté
+- **Tests**: ✅ Listes numérotées basiques, ❌ indentation multi-niveaux
+- **Demo**: ✅ Listes numérotées simples fonctionnelles, indentation reportée
 
 **Task 13: Système de sauvegarde fichiers markdown**
 - Créer module

@@ -30,11 +30,12 @@ pub fn detect_list_item(content: &str) -> Option<ListInfo> {
     if let Some(dot_pos) = trimmed.find(". ") {
         if dot_pos > 0 && trimmed[..dot_pos].chars().all(|c| c.is_ascii_digit()) {
             let list_content = &trimmed[dot_pos + 2..];
+            let number_str = &trimmed[..dot_pos];
             return Some(ListInfo {
                 list_type: ListType::Ordered,
                 indent_level: indent_count / 2,
                 content: list_content.to_string(),
-                marker: '1', // Default marker for ordered lists
+                marker: number_str.chars().next().unwrap_or('1'),
             });
         }
     }

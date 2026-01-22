@@ -256,6 +256,31 @@ impl Widget for BlockEditor {
             return;
         }
         
+        // Handle list renumbering
+        if let Some(start_index) = self.event_handler.should_renumber_lists {
+            // Find the start of the list sequence
+            let mut list_start = start_index;
+            while list_start > 0 {
+                if let Some(prev_block) = self.editor_state.blocks().get(list_start - 1) {
+                    if let Some(list_info) = crate::markdown::parser::detect_list_item(&prev_block.content) {
+                        if list_info.list_type == crate::markdown::parser::ListType::Ordered {
+                            list_start -= 1;
+                            continue;
+                        }
+                    }
+                }
+                break;
+            }
+            
+            // Renumber from the start of the sequence
+            let blocks = self.editor_state.blocks_mut();
+            self.event_handler.ordered_list_manager.renumber_list_sequence(blocks, list_start);
+            
+            self.renderer.clear_items();
+            cx.redraw_all();
+            return;
+        }
+        
         if let Some(new_active) = self.event_handler.navigation_target {
             let old_active = self.editor_state.active_block_index();
             self.editor_state.set_active_block(new_active);
