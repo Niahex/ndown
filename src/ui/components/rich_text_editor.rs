@@ -75,6 +75,7 @@ pub struct RichTextEditor {
     #[rust] hover: f32,
     #[rust] text_positions: Vec<(usize, f64)>, // (char_index, x_position)
     #[rust] is_dragging: bool,
+    #[rust] clipboard_content: Option<String>, // Internal clipboard
 }
 
 impl LiveHook for RichTextEditor {
@@ -85,6 +86,27 @@ impl LiveHook for RichTextEditor {
 
 impl Widget for RichTextEditor {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
+        // Handle clipboard events first
+        match event {
+            Event::TextCopy(tc) => {
+                if let Some(selected) = self.get_selected_text() {
+                    *tc.response.borrow_mut() = Some(selected.clone());
+                    self.clipboard_content = Some(selected);
+                }
+                return;
+            }
+            Event::TextCut(tc) => {
+                if let Some(selected) = self.get_selected_text() {
+                    *tc.response.borrow_mut() = Some(selected.clone());
+                    self.clipboard_content = Some(selected);
+                    self.delete_selection();
+                    cx.redraw_all();
+                }
+                return;
+            }
+            _ => {}
+        }
+        
         match event {
             Event::KeyDown(ke) => {
                 match ke.key_code {
@@ -117,16 +139,52 @@ impl Widget for RichTextEditor {
                         }
                     }
                     KeyCode::Backspace => {
-                        if self.cursor_pos > 0 {
+                        if self.has_selection() {
+                            self.delete_selection();
+                            cx.redraw_all();
+                        } else if self.cursor_pos > 0 {
                             self.text.remove(self.cursor_pos - 1);
                             self.cursor_pos -= 1;
                             cx.redraw_all();
                         }
                     }
+                    KeyCode::KeyC if ke.modifiers.control => {
+                        if self.has_selection() {
+                            cx.copy_to_clipboard(&self.get_selected_text().unwrap_or_default());
+                        }
+                    }
+                    KeyCode::KeyX if ke.modifiers.control => {
+                        if let Some(selected) = self.get_selected_text() {
+                            cx.copy_to_clipboard(&selected);
+                            self.delete_selection();
+                            cx.redraw_all();
+                        }
+                    }
+                    KeyCode::KeyV if ke.modifiers.control => {
+                        // Use internal clipboard if available, otherwise request from system
+                        if let Some(clipboard_text) = &self.clipboard_content.clone() {
+                            self.paste_text(clipboard_text);
+                            cx.redraw_all();
+                        } else {
+                            // Trigger system paste - this will generate TextInput event
+                            // For now, we'll use a simple approach
+                        }
+                    }
+                    KeyCode::KeyA if ke.modifiers.control => {
+                        // Select all
+                        self.selection_start = Some(0);
+                        self.cursor_pos = self.text.len();
+                        cx.redraw_all();
+                    }
                     _ => {}
                 }
             }
             Event::TextInput(ti) => {
+                // Delete selection if any before inserting
+                if self.has_selection() {
+                    self.delete_selection();
+                }
+                
                 self.text.insert_str(self.cursor_pos, &ti.input);
                 self.cursor_pos += ti.input.len();
                 cx.redraw_all();
@@ -210,6 +268,97 @@ impl RichTextEditor {
     pub fn set_text(&mut self, text: String) {
         self.text = text;
         self.cursor_pos = self.cursor_pos.min(self.text.len());
+        self.selection_start = None;
+    }
+    
+    pub fn get_selected_text(&self) -> Option<String> {
+        if let Some(start) = self.selection_start {
+            let (sel_start, sel_end) = if start <= self.cursor_pos { 
+                (start, self.cursor_pos) 
+            } else { 
+                (self.cursor_pos, start) 
+            };
+            
+            if sel_start != sel_end {
+                return Some(self.text[sel_start..sel_end].to_string());
+            }
+        }
+        None
+    }
+    
+    pub fn insert_text_at_cursor(&mut self, text: &str) {
+        // Delete selection if any
+        if let Some(start) = self.selection_start {
+            let (sel_start, sel_end) = if start <= self.cursor_pos { 
+                (start, self.cursor_pos) 
+            } else { 
+                (self.cursor_pos, start) 
+            };
+            
+            if sel_start != sel_end {
+                self.text.drain(sel_start..sel_end);
+                self.cursor_pos = sel_start;
+            }
+            self.selection_start = None;
+        }
+        
+        self.text.insert_str(self.cursor_pos, text);
+        self.cursor_pos += text.len();
+    }
+    
+    pub fn cursor_position(&self) -> usize {
+        self.cursor_pos
+    }
+    
+    pub fn set_cursor_position(&mut self, pos: usize) {
+        self.cursor_pos = pos.min(self.text.len());
+        self.selection_start = None;
+    }
+    
+    pub fn has_selection(&self) -> bool {
+        self.selection_start.is_some() && 
+        self.selection_start != Some(self.cursor_pos)
+    }
+    
+    pub fn delete_selection(&mut self) {
+        if let Some(start) = self.selection_start {
+            let (sel_start, sel_end) = if start <= self.cursor_pos { 
+                (start, self.cursor_pos) 
+            } else { 
+                (self.cursor_pos, start) 
+            };
+            
+            if sel_start != sel_end {
+                self.text.drain(sel_start..sel_end);
+                self.cursor_pos = sel_start;
+            }
+            self.selection_start = None;
+        }
+    }
+    
+    pub fn paste_text(&mut self, text: &str) {
+        // Delete selection if any
+        self.delete_selection();
+        
+        // Insert text at cursor
+        self.text.insert_str(self.cursor_pos, text);
+        self.cursor_pos += text.len();
+    }
+    
+    pub fn copy_selection(&mut self) -> Option<String> {
+        let selected = self.get_selected_text();
+        if let Some(ref text) = selected {
+            self.clipboard_content = Some(text.clone());
+        }
+        selected
+    }
+    
+    pub fn cut_selection(&mut self) -> Option<String> {
+        let selected = self.copy_selection();
+        if selected.is_some() {
+            self.delete_selection();
+        }
+        selected
     }
     
     fn render_rich_text(&mut self, cx: &mut Cx2d) {
