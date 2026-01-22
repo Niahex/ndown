@@ -125,7 +125,15 @@ Architecture technique:
 - **Tests**: ✅ Application compile et lance une fenêtre vide
 - **Demo**: ✅ Fenêtre Makepad s'ouvre et affiche un fond uni
 
-Task 2: Modèle de données pour blocs et état de base
+✅ Task 2: Modèle de données pour blocs et état de base
+- ✅ Définir struct Block avec id, type, contenu, métadonnées
+- ✅ Créer enum BlockType pour types de base (Text, Heading)
+- ✅ Implémenter struct EditorState avec Vec de blocs et index bloc actif
+- ✅ Ajouter méthodes de base: créer bloc, supprimer bloc, naviguer entre blocs
+- **Tests**: ✅ Créer/supprimer blocs, changer bloc actif
+- **Demo**: ✅ État en mémoire avec quelques blocs, affichage debug dans console
+
+Task 3: Affichage simple de blocs en mode texte
 - Définir struct Block avec id, type, contenu, métadonnées
 - Créer enum BlockType pour types de base (Text, Heading)
 - Implémenter struct EditorState avec Vec de blocs et index bloc actif
