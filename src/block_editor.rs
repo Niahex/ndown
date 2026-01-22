@@ -31,6 +31,45 @@ live_design! {
         }
     }
     
+    BlockInputH1 = <TextInput> {
+        width: Fill
+        height: Fit
+        padding: 10
+        draw_bg: {
+            color: #2a2a2a
+        }
+        draw_text: {
+            text_style: <THEME_FONT_REGULAR> {font_size: 25}  // 1.8 * 14
+            color: #ffffff
+        }
+    }
+    
+    BlockInputH2 = <TextInput> {
+        width: Fill
+        height: Fit
+        padding: 10
+        draw_bg: {
+            color: #2a2a2a
+        }
+        draw_text: {
+            text_style: <THEME_FONT_REGULAR> {font_size: 21}  // 1.5 * 14
+            color: #ffffff
+        }
+    }
+    
+    BlockInputH3 = <TextInput> {
+        width: Fill
+        height: Fit
+        padding: 10
+        draw_bg: {
+            color: #2a2a2a
+        }
+        draw_text: {
+            text_style: <THEME_FONT_REGULAR> {font_size: 18}  // 1.3 * 14
+            color: #ffffff
+        }
+    }
+    
     BlockInputInactive = <TextInput> {
         width: Fill
         height: Fit
@@ -45,6 +84,48 @@ live_design! {
         }
     }
     
+    BlockInputInactiveH1 = <TextInput> {
+        width: Fill
+        height: Fit
+        padding: 10
+        is_read_only: true
+        draw_bg: {
+            color: #1a1a1a
+        }
+        draw_text: {
+            text_style: <THEME_FONT_REGULAR> {font_size: 25}
+            color: #cccccc
+        }
+    }
+    
+    BlockInputInactiveH2 = <TextInput> {
+        width: Fill
+        height: Fit
+        padding: 10
+        is_read_only: true
+        draw_bg: {
+            color: #1a1a1a
+        }
+        draw_text: {
+            text_style: <THEME_FONT_REGULAR> {font_size: 21}
+            color: #cccccc
+        }
+    }
+    
+    BlockInputInactiveH3 = <TextInput> {
+        width: Fill
+        height: Fit
+        padding: 10
+        is_read_only: true
+        draw_bg: {
+            color: #1a1a1a
+        }
+        draw_text: {
+            text_style: <THEME_FONT_REGULAR> {font_size: 18}
+            color: #cccccc
+        }
+    }
+    
     pub BlockEditor = {{BlockEditor}} {
         width: Fill, height: Fill
         flow: Down
@@ -52,7 +133,13 @@ live_design! {
         
         BlockLabel = <BlockLabelBase> {}
         BlockInput = <BlockInputBase> {}
+        BlockInputH1 = <BlockInputH1> {}
+        BlockInputH2 = <BlockInputH2> {}
+        BlockInputH3 = <BlockInputH3> {}
         BlockInputInactive = <BlockInputInactive> {}
+        BlockInputInactiveH1 = <BlockInputInactiveH1> {}
+        BlockInputInactiveH2 = <BlockInputInactiveH2> {}
+        BlockInputInactiveH3 = <BlockInputInactiveH3> {}
     }
 }
 
@@ -88,10 +175,35 @@ impl LiveHook for BlockEditor {
     }
 }
 
+impl BlockEditor {
+    fn detect_heading_level(content: &str) -> Option<u8> {
+        let trimmed = content.trim_start();
+        if trimmed.starts_with("### ") {
+            Some(3)
+        } else if trimmed.starts_with("## ") {
+            Some(2)
+        } else if trimmed.starts_with("# ") {
+            Some(1)
+        } else {
+            None
+        }
+    }
+    
+    fn get_template_for_block(content: &str, is_active: bool) -> LiveId {
+        match Self::detect_heading_level(content) {
+            Some(1) => if is_active { live_id!(BlockInputH1) } else { live_id!(BlockInputInactiveH1) },
+            Some(2) => if is_active { live_id!(BlockInputH2) } else { live_id!(BlockInputInactiveH2) },
+            Some(3) => if is_active { live_id!(BlockInputH3) } else { live_id!(BlockInputInactiveH3) },
+            _ => if is_active { live_id!(BlockInput) } else { live_id!(BlockInputInactive) },
+        }
+    }
+}
+
 impl Widget for BlockEditor {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
         let mut navigation_target: Option<usize> = None;
         let mut should_delete_block = false;
+        let mut blocks_to_recreate = Vec::new();
         
         // Handle events for all items normally - let TextInputs handle their own clicks
         for (block_id, item) in self.items.iter_mut() {
@@ -102,7 +214,16 @@ impl Widget for BlockEditor {
                     match action.cast() {
                         TextInputAction::Changed(text) => {
                             if let Some(block) = self.editor_state.blocks_mut().get_mut(block_id) {
-                                block.content = text;
+                                let old_content = block.content.clone();
+                                block.content = text.clone();
+                                
+                                // Check if heading level changed - if so, recreate widget
+                                let old_level = Self::detect_heading_level(&old_content);
+                                let new_level = Self::detect_heading_level(&text);
+                                
+                                if old_level != new_level {
+                                    blocks_to_recreate.push(block_id);
+                                }
                             }
                         }
                         TextInputAction::KeyFocus => {
@@ -148,6 +269,11 @@ impl Widget for BlockEditor {
                     }
                 }
             }
+        }
+        
+        // Remove blocks that need to be recreated
+        for block_id in blocks_to_recreate {
+            self.items.remove(&block_id);
         }
         
         if should_delete_block {
@@ -244,11 +370,14 @@ impl Widget for BlockEditor {
         for (index, block) in self.editor_state.blocks().iter().enumerate() {
             let is_active = index == active_index;
             
-            let template_id = if is_active {
-                live_id!(BlockInput)
-            } else {
-                live_id!(BlockInputInactive)
+            let content = match &block.block_type {
+                BlockType::Text => block.content.clone(),
+                BlockType::Heading(level) => {
+                    format!("{} {}", "#".repeat(*level as usize), block.content)
+                }
             };
+            
+            let template_id = Self::get_template_for_block(&content, is_active);
             
             // Get or create widget for this block
             if !self.items.contains_key(&index) {
@@ -262,13 +391,6 @@ impl Widget for BlockEditor {
             
             // Set text content
             if let Some(item) = self.items.get(&index) {
-                let content = match &block.block_type {
-                    BlockType::Text => block.content.clone(),
-                    BlockType::Heading(level) => {
-                        format!("{} {}", "#".repeat(*level as usize), block.content)
-                    }
-                };
-                
                 item.set_text(cx, &content);
             }
         }
