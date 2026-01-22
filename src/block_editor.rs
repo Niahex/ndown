@@ -74,17 +74,43 @@ impl LiveHook for BlockEditor {
 impl Widget for BlockEditor {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
         // Handle events for each item and capture their actions
+        let mut navigation_target: Option<usize> = None;
+        
         for (block_id, item) in self.items.iter_mut() {
             let block_id = *block_id;
             for action in cx.capture_actions(|cx| item.handle_event(cx, event, scope)) {
                 if let Some(action) = action.as_widget_action() {
-                    if let TextInputAction::Changed(text) = action.cast() {
-                        if let Some(block) = self.editor_state.blocks_mut().get_mut(block_id) {
-                            block.content = text;
+                    match action.cast() {
+                        TextInputAction::Changed(text) => {
+                            if let Some(block) = self.editor_state.blocks_mut().get_mut(block_id) {
+                                block.content = text;
+                            }
                         }
+                        TextInputAction::KeyDownUnhandled(ke) => {
+                            // Handle navigation between blocks
+                            match ke.key_code {
+                                KeyCode::ArrowUp if block_id > 0 => {
+                                    navigation_target = Some(block_id - 1);
+                                }
+                                KeyCode::ArrowDown if block_id < self.editor_state.blocks().len() - 1 => {
+                                    navigation_target = Some(block_id + 1);
+                                }
+                                _ => {}
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }
+        }
+        
+        // Apply navigation after the loop
+        if let Some(new_active) = navigation_target {
+            let old_active = self.editor_state.active_block_index();
+            self.editor_state.set_active_block(new_active);
+            self.items.remove(&old_active);
+            self.items.remove(&new_active);
+            cx.redraw_all();
         }
         
         // Check for clicks on items to change active block
@@ -113,37 +139,81 @@ impl Widget for BlockEditor {
         
         // Handle Enter key for creating blocks
         if let Event::KeyDown(ke) = event {
-            if ke.key_code == KeyCode::ReturnKey && !ke.modifiers.shift {
-                let old_active = self.editor_state.active_block_index();
-                let new_index = old_active + 1;
+            match ke.key_code {
+                KeyCode::ReturnKey if !ke.modifiers.shift => {
+                    let old_active = self.editor_state.active_block_index();
+                    let new_index = old_active + 1;
+                    
+                    self.editor_state.create_block(new_index, crate::block::Block::text(String::new()));
+                    self.editor_state.set_active_block(new_index);
+                    
+                    // Remove old active and new active so they get recreated with correct templates
+                    self.items.remove(&old_active);
+                    self.items.remove(&new_index);
+                    
+                    cx.redraw_all();
+                }
                 
-                self.editor_state.create_block(new_index, crate::block::Block::text(String::new()));
-                self.editor_state.set_active_block(new_index);
-                
-                // Remove old active and new active so they get recreated with correct templates
-                self.items.remove(&old_active);
-                self.items.remove(&new_index);
-                
-                cx.redraw_all();
-            }
-            
-            // Handle Backspace to delete empty blocks
-            if ke.key_code == KeyCode::Backspace {
-                let active_index = self.editor_state.active_block_index();
-                
-                // Only delete if block is empty, not the first block, and more than 1 block exists
-                if active_index > 0 && self.editor_state.blocks().len() > 1 {
-                    if let Some(block) = self.editor_state.blocks().get(active_index) {
-                        if block.content.is_empty() {
-                            self.editor_state.delete_block(active_index);
-                            self.editor_state.set_active_block(active_index - 1);
-                            
-                            // Clear items to force recreation
-                            self.items.clear();
-                            cx.redraw_all();
+                KeyCode::Backspace => {
+                    let active_index = self.editor_state.active_block_index();
+                    
+                    // Only delete if block is empty, not the first block, and more than 1 block exists
+                    if active_index > 0 && self.editor_state.blocks().len() > 1 {
+                        if let Some(block) = self.editor_state.blocks().get(active_index) {
+                            if block.content.is_empty() {
+                                self.editor_state.delete_block(active_index);
+                                self.editor_state.set_active_block(active_index - 1);
+                                
+                                // Clear items to force recreation
+                                self.items.clear();
+                                cx.redraw_all();
+                            }
                         }
                     }
                 }
+                
+                // Ctrl+Home: go to first block
+                KeyCode::Home if ke.modifiers.control => {
+                    let old_active = self.editor_state.active_block_index();
+                    self.editor_state.set_active_block(0);
+                    self.items.remove(&old_active);
+                    self.items.remove(&0);
+                    cx.redraw_all();
+                }
+                
+                // Ctrl+End: go to last block
+                KeyCode::End if ke.modifiers.control => {
+                    let old_active = self.editor_state.active_block_index();
+                    let last_index = self.editor_state.blocks().len().saturating_sub(1);
+                    self.editor_state.set_active_block(last_index);
+                    self.items.remove(&old_active);
+                    self.items.remove(&last_index);
+                    cx.redraw_all();
+                }
+                
+                // Page Up: go to previous block
+                KeyCode::PageUp => {
+                    let active_index = self.editor_state.active_block_index();
+                    if active_index > 0 {
+                        self.editor_state.set_active_block(active_index - 1);
+                        self.items.remove(&active_index);
+                        self.items.remove(&(active_index - 1));
+                        cx.redraw_all();
+                    }
+                }
+                
+                // Page Down: go to next block
+                KeyCode::PageDown => {
+                    let active_index = self.editor_state.active_block_index();
+                    if active_index < self.editor_state.blocks().len() - 1 {
+                        self.editor_state.set_active_block(active_index + 1);
+                        self.items.remove(&active_index);
+                        self.items.remove(&(active_index + 1));
+                        cx.redraw_all();
+                    }
+                }
+                
+                _ => {}
             }
         }
     }
