@@ -45,6 +45,12 @@ live_design! {
                 return #ffffff;
             }
         }
+        
+        draw_selection: {
+            fn pixel(self) -> vec4 {
+                return #x3b82f6; // Blue selection
+            }
+        }
     }
 }
 
@@ -60,12 +66,15 @@ pub struct RichTextEditor {
     #[live] draw_text_italic: DrawText,
     #[live] draw_text_code: DrawText,
     #[live] draw_cursor: DrawQuad,
+    #[live] draw_selection: DrawQuad,
     
     #[rust] text: String,
     #[rust] cursor_pos: usize,
+    #[rust] selection_start: Option<usize>,
     #[rust] is_focused: bool,
     #[rust] hover: f32,
     #[rust] text_positions: Vec<(usize, f64)>, // (char_index, x_position)
+    #[rust] is_dragging: bool,
 }
 
 impl LiveHook for RichTextEditor {
@@ -80,12 +89,28 @@ impl Widget for RichTextEditor {
             Event::KeyDown(ke) => {
                 match ke.key_code {
                     KeyCode::ArrowLeft => {
+                        if ke.modifiers.shift {
+                            if self.selection_start.is_none() {
+                                self.selection_start = Some(self.cursor_pos);
+                            }
+                        } else {
+                            self.selection_start = None;
+                        }
+                        
                         if self.cursor_pos > 0 {
                             self.cursor_pos -= 1;
                             cx.redraw_all();
                         }
                     }
                     KeyCode::ArrowRight => {
+                        if ke.modifiers.shift {
+                            if self.selection_start.is_none() {
+                                self.selection_start = Some(self.cursor_pos);
+                            }
+                        } else {
+                            self.selection_start = None;
+                        }
+                        
                         if self.cursor_pos < self.text.len() {
                             self.cursor_pos += 1;
                             cx.redraw_all();
@@ -115,16 +140,38 @@ impl Widget for RichTextEditor {
                     let click_x = me.abs.x - self.area.rect(cx).pos.x - 10.0; // Account for padding
                     self.cursor_pos = self.find_cursor_position_from_x(click_x);
                     
+                    // Start selection or clear it
+                    self.selection_start = None;
+                    self.is_dragging = true;
+                    
                     cx.redraw_all();
                 }
             }
             Event::MouseMove(me) => {
+                let rect = self.area.rect(cx);
                 let was_hover = self.hover > 0.5;
-                let is_hover = self.area.rect(cx).contains(me.abs);
+                let is_hover = rect.contains(me.abs);
+                
                 if was_hover != is_hover {
                     self.hover = if is_hover { 1.0 } else { 0.0 };
                     cx.redraw_all();
                 }
+                
+                // Handle text selection dragging
+                if self.is_dragging && rect.contains(me.abs) {
+                    let click_x = me.abs.x - rect.pos.x - 10.0;
+                    let new_pos = self.find_cursor_position_from_x(click_x);
+                    
+                    if self.selection_start.is_none() {
+                        self.selection_start = Some(self.cursor_pos);
+                    }
+                    
+                    self.cursor_pos = new_pos;
+                    cx.redraw_all();
+                }
+            }
+            Event::MouseUp(_) => {
+                self.is_dragging = false;
             }
             _ => {}
         }
@@ -136,6 +183,11 @@ impl Widget for RichTextEditor {
         // Draw background
         self.draw_bg.draw_vars.set_uniform(cx, &[id!(hover)], &[self.hover]);
         self.draw_bg.draw_walk(cx, Walk::fill());
+        
+        // Draw selection background if there's a selection
+        if let Some(start) = self.selection_start {
+            self.draw_selection_background(cx, start, self.cursor_pos);
+        }
         
         // Parse and render rich text
         self.render_rich_text(cx);
@@ -262,6 +314,34 @@ impl RichTextEditor {
         }
         
         best_pos.min(self.text.len())
+    }
+    
+    fn draw_selection_background(&mut self, cx: &mut Cx2d, start: usize, end: usize) {
+        let (sel_start, sel_end) = if start <= end { (start, end) } else { (end, start) };
+        
+        if sel_start == sel_end {
+            return; // No selection
+        }
+        
+        // Find X positions for selection bounds
+        let start_x = self.text_positions.iter()
+            .find(|(idx, _)| *idx == sel_start)
+            .map(|(_, x)| *x)
+            .unwrap_or(0.0);
+            
+        let end_x = self.text_positions.iter()
+            .find(|(idx, _)| *idx == sel_end)
+            .map(|(_, x)| *x + 8.0) // Add character width
+            .unwrap_or(start_x + 8.0);
+        
+        let selection_walk = Walk {
+            width: Size::Fixed((end_x - start_x).max(1.0)),
+            height: Size::Fixed(20.0),
+            margin: Margin { left: start_x, ..Margin::default() },
+            ..Walk::default()
+        };
+        
+        self.draw_selection.draw_walk(cx, selection_walk);
     }
     
     fn draw_cursor_at_position(&mut self, cx: &mut Cx2d) {
