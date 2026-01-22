@@ -1,5 +1,6 @@
 use makepad_widgets::*;
 use makepad_widgets::text_input::TextInputAction;
+use makepad_draw::text::selection::Cursor;
 use crate::editor_state::EditorState;
 use crate::block::BlockType;
 
@@ -20,12 +21,27 @@ live_design! {
     BlockInputBase = <TextInput> {
         width: Fill
         height: Fit
+        padding: 10
         draw_bg: {
             color: #2a2a2a
         }
         draw_text: {
             text_style: <THEME_FONT_REGULAR> {font_size: 14}
             color: #ffffff
+        }
+    }
+    
+    BlockInputInactive = <TextInput> {
+        width: Fill
+        height: Fit
+        padding: 10
+        is_read_only: true
+        draw_bg: {
+            color: #1a1a1a
+        }
+        draw_text: {
+            text_style: <THEME_FONT_REGULAR> {font_size: 14}
+            color: #cccccc
         }
     }
     
@@ -36,6 +52,7 @@ live_design! {
         
         BlockLabel = <BlockLabelBase> {}
         BlockInput = <BlockInputBase> {}
+        BlockInputInactive = <BlockInputInactive> {}
     }
 }
 
@@ -73,11 +90,13 @@ impl LiveHook for BlockEditor {
 
 impl Widget for BlockEditor {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
-        // Handle events for each item and capture their actions
         let mut navigation_target: Option<usize> = None;
+        let mut should_delete_block = false;
         
+        // Handle events for all items normally - let TextInputs handle their own clicks
         for (block_id, item) in self.items.iter_mut() {
             let block_id = *block_id;
+            
             for action in cx.capture_actions(|cx| item.handle_event(cx, event, scope)) {
                 if let Some(action) = action.as_widget_action() {
                     match action.cast() {
@@ -86,14 +105,41 @@ impl Widget for BlockEditor {
                                 block.content = text;
                             }
                         }
+                        TextInputAction::KeyFocus => {
+                            // When a TextInput gets focus, make it the active block
+                            let old_active = self.editor_state.active_block_index();
+                            if block_id != old_active {
+                                self.editor_state.set_active_block(block_id);
+                                self.items.remove(&old_active);
+                                self.items.remove(&block_id);
+                                cx.redraw_all();
+                                return;
+                            } else {
+                                // Same block getting focus - position cursor at end
+                                let text_input = item.as_text_input();
+                                let text_len = text_input.text().len();
+                                text_input.set_cursor(cx, Cursor {
+                                    index: text_len,
+                                    prefer_next_row: false,
+                                }, false);
+                                item.redraw(cx);
+                            }
+                        }
                         TextInputAction::KeyDownUnhandled(ke) => {
-                            // Handle navigation between blocks
                             match ke.key_code {
                                 KeyCode::ArrowUp if block_id > 0 => {
                                     navigation_target = Some(block_id - 1);
                                 }
                                 KeyCode::ArrowDown if block_id < self.editor_state.blocks().len() - 1 => {
                                     navigation_target = Some(block_id + 1);
+                                }
+                                KeyCode::Backspace if block_id > 0 && self.editor_state.blocks().len() > 1 => {
+                                    if let Some(block) = self.editor_state.blocks().get(block_id) {
+                                        if block.content.is_empty() {
+                                            should_delete_block = true;
+                                            navigation_target = Some(block_id - 1);
+                                        }
+                                    }
                                 }
                                 _ => {}
                             }
@@ -104,7 +150,14 @@ impl Widget for BlockEditor {
             }
         }
         
-        // Apply navigation after the loop
+        if should_delete_block {
+            let active_index = self.editor_state.active_block_index();
+            self.editor_state.delete_block(active_index);
+            self.items.clear();
+            cx.redraw_all();
+            return;
+        }
+        
         if let Some(new_active) = navigation_target {
             let old_active = self.editor_state.active_block_index();
             self.editor_state.set_active_block(new_active);
@@ -113,31 +166,7 @@ impl Widget for BlockEditor {
             cx.redraw_all();
         }
         
-        // Check for clicks on items to change active block
-        let mut clicked_index = None;
-        for (index, item) in self.items.iter() {
-            if let Hit::FingerDown(_) = event.hits_with_options(cx, item.area(), HitOptions::default()) {
-                if *index != self.editor_state.active_block_index() {
-                    clicked_index = Some(*index);
-                    break;
-                }
-            }
-        }
-        
-        // Handle click to change active block
-        if let Some(new_active) = clicked_index {
-            let old_active = self.editor_state.active_block_index();
-            self.editor_state.set_active_block(new_active);
-            
-            // Remove old and new active to recreate with correct templates
-            self.items.remove(&old_active);
-            self.items.remove(&new_active);
-            
-            cx.redraw_all();
-            return;
-        }
-        
-        // Handle Enter key for creating blocks
+        // Handle keyboard shortcuts
         if let Event::KeyDown(ke) = event {
             match ke.key_code {
                 KeyCode::ReturnKey if !ke.modifiers.shift => {
@@ -152,24 +181,6 @@ impl Widget for BlockEditor {
                     self.items.remove(&new_index);
                     
                     cx.redraw_all();
-                }
-                
-                KeyCode::Backspace => {
-                    let active_index = self.editor_state.active_block_index();
-                    
-                    // Only delete if block is empty, not the first block, and more than 1 block exists
-                    if active_index > 0 && self.editor_state.blocks().len() > 1 {
-                        if let Some(block) = self.editor_state.blocks().get(active_index) {
-                            if block.content.is_empty() {
-                                self.editor_state.delete_block(active_index);
-                                self.editor_state.set_active_block(active_index - 1);
-                                
-                                // Clear items to force recreation
-                                self.items.clear();
-                                cx.redraw_all();
-                            }
-                        }
-                    }
                 }
                 
                 // Ctrl+Home: go to first block
@@ -236,7 +247,7 @@ impl Widget for BlockEditor {
             let template_id = if is_active {
                 live_id!(BlockInput)
             } else {
-                live_id!(BlockLabel)
+                live_id!(BlockInputInactive)
             };
             
             // Get or create widget for this block

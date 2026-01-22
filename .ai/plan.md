@@ -140,42 +140,27 @@ Architecture technique:
 - **Tests**: ✅ Afficher 3-5 blocs, identifier visuellement le bloc actif
 - **Demo**: ✅ Interface montrant plusieurs blocs texte, un surligné comme actif
 
-Task 4: Input clavier de base et création de blocs
-- Définir struct Block avec id, type, contenu, métadonnées
-- Créer enum BlockType pour types de base (Text, Heading)
-- Implémenter struct EditorState avec Vec de blocs et index bloc actif
-- Ajouter méthodes de base: créer bloc, supprimer bloc, naviguer entre blocs
-- **Tests**: Créer/supprimer blocs, changer bloc actif
-- **Demo**: État en mémoire avec quelques blocs, affichage debug dans console
+✅Task 4: Input clavier de base et création de blocs
+- ✅ Définir struct Block avec id, type, contenu, métadonnées
+- ✅ Créer enum BlockType pour types de base (Text, Heading)
+- ✅ Implémenter struct EditorState avec Vec de blocs et index bloc actif
+- ✅ Ajouter méthodes de base: créer bloc, supprimer bloc, naviguer entre blocs
+- **Tests**: ✅ Créer/supprimer blocs, changer bloc actif
+- **Demo**: ✅ État en mémoire avec quelques blocs, affichage debug dans console
 
-Task 3: Affichage simple de blocs en mode texte
-- Créer composant Makepad BlockView pour afficher un bloc
-- Implémenter rendu basique: bloc actif avec fond différent, autres blocs en texte simple
-- Afficher liste verticale de blocs
-- **Tests**: Afficher 3-5 blocs, identifier visuellement le bloc actif
-- **Demo**: Interface montrant plusieurs blocs texte, un surligné comme actif
-
-Task 4: Input clavier de base et création de blocs
-- Capturer événements clavier dans Makepad
-- Implémenter édition texte dans bloc actif (saisie caractères, backspace)
-- Implémenter Enter pour créer nouveau bloc
-- Implémenter Shift+Enter pour retour à ligne dans bloc
-- **Tests**: Taper du texte, créer nouveaux blocs avec Enter
-- **Demo**: Éditeur fonctionnel où on peut taper et créer des blocs
-
-Task 5: Navigation au clavier entre blocs
-- Implémenter flèches haut/bas pour navigation inter-blocs (quand sur première/dernière ligne)
+✅ Task 5: Navigation au clavier entre blocs
+- ✅ Implémenter flèches haut/bas pour navigation inter-blocs (quand sur première/dernière ligne)
 - Implémenter Home/End pour début/fin de bloc
 - Implémenter Ctrl+Home/End pour début/fin document
-- Implémenter Page Up/Down
-- Gérer position curseur lors des transitions entre blocs
-- **Tests**: Naviguer entre blocs avec toutes les touches
-- **Demo**: Navigation fluide au clavier dans un document de 10+ blocs
+- ✅ Implémenter Page Up/Down
+- X Gérer position curseur lors des transitions entre blocs
+- **Tests**: ✅ Naviguer entre blocs avec toutes les touches
+- **Demo**: ✅ Navigation fluide au clavier dans un document de 10+ blocs
 
 Task 6: Clic souris pour sélection de blocs
-- Capturer événements souris sur blocs
-- Changer bloc actif au clic
-- Positionner curseur à l'endroit du clic dans le texte
+- ✅ Capturer événements souris sur blocs
+- ✅ Changer bloc actif au clic
+- ⚠️ Positionner curseur à l'endroit du clic dans le texte (curseur logique OK, indicateur visuel reste au début)
 - **Tests**: Cliquer sur différents blocs, vérifier changement d'état
 - **Demo**: Navigation mixte clavier + souris fonctionnelle
 
