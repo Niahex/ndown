@@ -61,6 +61,7 @@
           wayland
           vulkan-loader
           mesa
+          libglvnd
           xorg.libxcb
           xorg.libX11
           xorg.libXcursor
@@ -70,6 +71,7 @@
           openssl
           freetype
           alsa-lib
+          libpulseaudio
         ];
 
         # Dependencies needed only at runtime

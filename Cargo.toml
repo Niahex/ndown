@@ -5,8 +5,7 @@ edition = "2021"
 include = ["src/**/*", "Cargo.toml", "assets/**/*"]
 
 [dependencies]
-makepad-widgets = { git = "https://github.com/wyeworks/makepad", rev = "53b2e5c84" }
-makepad-code-editor = { git = "https://github.com/wyeworks/makepad", rev = "53b2e5c84" }
+makepad-widgets = { git = "https://github.com/makepad/makepad", rev = "774a07c" }
 
 [workspace]
 
