@@ -1,5 +1,6 @@
 use makepad_widgets::*;
 use crate::markdown::inline::{parse_inline_formatting, InlineFormat};
+use std::time::Instant;
 
 live_design! {
     RichTextEditorBase = {{RichTextEditor}} {
@@ -76,11 +77,27 @@ pub struct RichTextEditor {
     #[rust] text_positions: Vec<(usize, f64)>, // (char_index, x_position)
     #[rust] is_dragging: bool,
     #[rust] clipboard_content: Option<String>, // Internal clipboard
+    #[rust] undo_stack: Vec<UndoState>,
+    #[rust] redo_stack: Vec<UndoState>,
+    #[rust] max_undo_history: usize,
+    #[rust] last_click_time: f64,
+    #[rust] last_click_pos: usize,
+}
+
+#[derive(Clone, Debug)]
+struct UndoState {
+    text: String,
+    cursor_pos: usize,
+    selection_start: Option<usize>,
 }
 
 impl LiveHook for RichTextEditor {
     fn after_apply(&mut self, cx: &mut Cx, _apply: &mut Apply, _index: usize, _nodes: &[LiveNode]) {
         self.draw_bg.redraw(cx);
+        // Initialize undo system
+        if self.max_undo_history == 0 {
+            self.max_undo_history = 50; // Default max undo steps
+        }
     }
 }
 
@@ -138,15 +155,24 @@ impl Widget for RichTextEditor {
                             cx.redraw_all();
                         }
                     }
-                    KeyCode::Backspace => {
+                    KeyCode::ReturnKey => {
+                        self.save_undo_state();
                         if self.has_selection() {
                             self.delete_selection();
-                            cx.redraw_all();
+                        }
+                        self.text.insert(self.cursor_pos, '\n');
+                        self.cursor_pos += 1;
+                        cx.redraw_all();
+                    }
+                    KeyCode::Backspace => {
+                        self.save_undo_state();
+                        if self.has_selection() {
+                            self.delete_selection();
                         } else if self.cursor_pos > 0 {
                             self.text.remove(self.cursor_pos - 1);
                             self.cursor_pos -= 1;
-                            cx.redraw_all();
                         }
+                        cx.redraw_all();
                     }
                     KeyCode::KeyC if ke.modifiers.control => {
                         if self.has_selection() {
@@ -169,6 +195,18 @@ impl Widget for RichTextEditor {
                             // Trigger system paste - this will generate TextInput event
                             // For now, we'll use a simple approach
                         }
+                    }
+                    KeyCode::KeyZ if ke.modifiers.control && !ke.modifiers.shift => {
+                        self.undo();
+                        cx.redraw_all();
+                    }
+                    KeyCode::KeyZ if ke.modifiers.control && ke.modifiers.shift => {
+                        self.redo();
+                        cx.redraw_all();
+                    }
+                    KeyCode::KeyY if ke.modifiers.control => {
+                        self.redo();
+                        cx.redraw_all();
                     }
                     KeyCode::KeyA if ke.modifiers.control => {
                         // Select all
@@ -196,11 +234,24 @@ impl Widget for RichTextEditor {
                     
                     // Calculate cursor position from click
                     let click_x = me.abs.x - self.area.rect(cx).pos.x - 10.0; // Account for padding
-                    self.cursor_pos = self.find_cursor_position_from_x(click_x);
+                    let new_cursor_pos = self.find_cursor_position_from_x(click_x);
                     
-                    // Start selection or clear it
-                    self.selection_start = None;
-                    self.is_dragging = true;
+                    // Check for double-click
+                    let current_time = me.time;
+                    let is_double_click = current_time - self.last_click_time < 0.5 && 
+                                         (new_cursor_pos as i32 - self.last_click_pos as i32).abs() < 3;
+                    
+                    if is_double_click {
+                        // Select word at cursor
+                        self.select_word_at_position(new_cursor_pos);
+                    } else {
+                        self.cursor_pos = new_cursor_pos;
+                        self.selection_start = None;
+                        self.is_dragging = true;
+                    }
+                    
+                    self.last_click_time = current_time;
+                    self.last_click_pos = new_cursor_pos;
                     
                     cx.redraw_all();
                 }
@@ -359,6 +410,84 @@ impl RichTextEditor {
             self.delete_selection();
         }
         selected
+    }
+    
+    // Undo/Redo system
+    pub fn save_undo_state(&mut self) {
+        let state = UndoState {
+            text: self.text.clone(),
+            cursor_pos: self.cursor_pos,
+            selection_start: self.selection_start,
+        };
+        
+        self.undo_stack.push(state);
+        if self.undo_stack.len() > self.max_undo_history {
+            self.undo_stack.remove(0);
+        }
+        
+        // Clear redo stack when new action is performed
+        self.redo_stack.clear();
+    }
+    
+    pub fn undo(&mut self) {
+        if let Some(state) = self.undo_stack.pop() {
+            // Save current state to redo stack
+            let current_state = UndoState {
+                text: self.text.clone(),
+                cursor_pos: self.cursor_pos,
+                selection_start: self.selection_start,
+            };
+            self.redo_stack.push(current_state);
+            
+            // Restore previous state
+            self.text = state.text;
+            self.cursor_pos = state.cursor_pos;
+            self.selection_start = state.selection_start;
+        }
+    }
+    
+    pub fn redo(&mut self) {
+        if let Some(state) = self.redo_stack.pop() {
+            // Save current state to undo stack
+            let current_state = UndoState {
+                text: self.text.clone(),
+                cursor_pos: self.cursor_pos,
+                selection_start: self.selection_start,
+            };
+            self.undo_stack.push(current_state);
+            
+            // Restore redo state
+            self.text = state.text;
+            self.cursor_pos = state.cursor_pos;
+            self.selection_start = state.selection_start;
+        }
+    }
+    
+    // Word selection for double-click
+    pub fn select_word_at_position(&mut self, pos: usize) {
+        let chars: Vec<char> = self.text.chars().collect();
+        if chars.is_empty() || pos >= chars.len() {
+            return;
+        }
+        
+        // Find word boundaries
+        let mut start = pos;
+        let mut end = pos;
+        
+        // Move start backward to word boundary
+        while start > 0 && chars[start - 1].is_alphanumeric() {
+            start -= 1;
+        }
+        
+        // Move end forward to word boundary
+        while end < chars.len() && chars[end].is_alphanumeric() {
+            end += 1;
+        }
+        
+        if start != end {
+            self.selection_start = Some(start);
+            self.cursor_pos = end;
+        }
     }
     
     fn render_rich_text(&mut self, cx: &mut Cx2d) {
