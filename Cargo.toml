@@ -6,6 +6,9 @@ include = ["src/**/*", "Cargo.toml", "assets/**/*"]
 
 [dependencies]
 makepad-widgets = { git = "https://github.com/makepad/makepad", rev = "774a07c" }
+log = "0.4"
+env_logger = "0.11"
+chrono = "0.4"
 
 [workspace]
 
