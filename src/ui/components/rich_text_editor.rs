@@ -97,6 +97,8 @@ pub struct RichTextEditor {
     #[rust] max_undo_history: usize,
     #[rust] last_click_time: f64,
     #[rust] last_click_pos: usize,
+    #[rust] repeat_timer: Option<Timer>,
+    #[rust] repeating_key: Option<KeyCode>,
 }
 
 #[derive(Clone, Debug)]
@@ -190,12 +192,14 @@ impl Widget for RichTextEditor {
                     }
                     KeyCode::Backspace => {
                         self.save_undo_state();
-                        if self.has_selection() {
-                            self.delete_selection();
-                        } else if self.cursor_pos > 0 {
-                            self.text.remove(self.cursor_pos - 1);
-                            self.cursor_pos -= 1;
-                        }
+                        self.perform_backspace();
+                        self.start_key_repeat(cx, KeyCode::Backspace);
+                        cx.redraw_all();
+                    }
+                    KeyCode::Delete => {
+                        self.save_undo_state();
+                        self.perform_delete();
+                        self.start_key_repeat(cx, KeyCode::Delete);
                         cx.redraw_all();
                     }
                     KeyCode::KeyC if ke.modifiers.control => {
@@ -303,8 +307,36 @@ impl Widget for RichTextEditor {
                     cx.redraw_all();
                 }
             }
-            Event::MouseUp(_) => {
-                self.is_dragging = false;
+            Event::KeyUp(ke) => {
+                // Stop key repeat when key is released
+                if Some(ke.key_code) == self.repeating_key {
+                    self.repeating_key = None;
+                    if let Some(timer) = self.repeat_timer.take() {
+                        cx.stop_timer(timer);
+                    }
+                }
+            }
+            Event::Timer(te) => {
+                // Handle key repeat
+                if let Some(timer) = &self.repeat_timer {
+                    if te.timer_id == timer.0 {
+                        if let Some(key) = self.repeating_key {
+                            match key {
+                                KeyCode::Backspace => {
+                                    self.perform_backspace();
+                                    cx.redraw_all();
+                                }
+                                KeyCode::Delete => {
+                                    self.perform_delete();
+                                    cx.redraw_all();
+                                }
+                                _ => {}
+                            }
+                            // Continue repeating with faster interval
+                            self.repeat_timer = Some(cx.start_timeout(0.05)); // 50ms repeat rate
+                        }
+                    }
+                }
             }
             _ => {}
         }
@@ -511,6 +543,29 @@ impl RichTextEditor {
         if start != end {
             self.selection_start = Some(start);
             self.cursor_pos = end;
+        }
+    }
+    
+    // Key repeat system
+    fn start_key_repeat(&mut self, cx: &mut Cx, key: KeyCode) {
+        self.repeating_key = Some(key);
+        self.repeat_timer = Some(cx.start_timeout(0.5)); // Initial delay 500ms
+    }
+    
+    fn perform_backspace(&mut self) {
+        if self.has_selection() {
+            self.delete_selection();
+        } else if self.cursor_pos > 0 {
+            self.text.remove(self.cursor_pos - 1);
+            self.cursor_pos -= 1;
+        }
+    }
+    
+    fn perform_delete(&mut self) {
+        if self.has_selection() {
+            self.delete_selection();
+        } else if self.cursor_pos < self.text.len() {
+            self.text.remove(self.cursor_pos);
         }
     }
     
