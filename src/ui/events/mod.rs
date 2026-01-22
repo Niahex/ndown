@@ -79,7 +79,7 @@ impl EventHandler {
             }
             KeyCode::Backspace if block_id > 0 && editor_state.blocks().len() > 1 => {
                 if let Some(block) = editor_state.blocks().get(block_id) {
-                    if block.content.is_empty() {
+                    if block.content.trim().is_empty() {
                         self.should_delete_block = true;
                         self.navigation_target = Some(block_id - 1);
                     }

@@ -222,6 +222,18 @@ impl Widget for BlockEditor {
                         cx.redraw_all();
                     }
                 }
+                KeyCode::Backspace => {
+                    let active_index = self.editor_state.active_block_index();
+                    if let Some(block) = self.editor_state.blocks().get(active_index) {
+                        if block.content.trim().is_empty() && active_index > 0 && self.editor_state.blocks().len() > 1 {
+                            self.editor_state.delete_block(active_index);
+                            self.editor_state.set_active_block(active_index - 1);
+                            self.renderer.clear_items();
+                            cx.redraw_all();
+                            return;
+                        }
+                    }
+                }
                 _ => {}
             }
         }
