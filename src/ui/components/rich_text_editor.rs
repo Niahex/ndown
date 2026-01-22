@@ -65,6 +65,7 @@ pub struct RichTextEditor {
     #[rust] cursor_pos: usize,
     #[rust] is_focused: bool,
     #[rust] hover: f32,
+    #[rust] text_positions: Vec<(usize, f64)>, // (char_index, x_position)
 }
 
 impl LiveHook for RichTextEditor {
@@ -105,10 +106,17 @@ impl Widget for RichTextEditor {
                 self.cursor_pos += ti.input.len();
                 cx.redraw_all();
             }
-            Event::MouseDown(_) => {
-                self.is_focused = true;
-                cx.set_key_focus(self.area);
-                cx.redraw_all();
+            Event::MouseDown(me) => {
+                if self.area.rect(cx).contains(me.abs) {
+                    self.is_focused = true;
+                    cx.set_key_focus(self.area);
+                    
+                    // Calculate cursor position from click
+                    let click_x = me.abs.x - self.area.rect(cx).pos.x - 10.0; // Account for padding
+                    self.cursor_pos = self.find_cursor_position_from_x(click_x);
+                    
+                    cx.redraw_all();
+                }
             }
             Event::MouseMove(me) => {
                 let was_hover = self.hover > 0.5;
@@ -153,46 +161,123 @@ impl RichTextEditor {
     }
     
     fn render_rich_text(&mut self, cx: &mut Cx2d) {
+        self.text_positions.clear();
         let spans = parse_inline_formatting(&self.text);
         let mut last_end = 0;
+        let mut current_x = 0.0;
+        
+        // Clone text to avoid borrow issues
+        let text_clone = self.text.clone();
         
         for span in spans {
             // Render text before this span
             if span.range.start > last_end {
-                let plain_text = &self.text[last_end..span.range.start];
-                self.draw_text.draw_walk(cx, Walk::fit(), Align::default(), plain_text);
+                let plain_text = &text_clone[last_end..span.range.start];
+                current_x = self.render_text_segment(cx, plain_text, current_x, last_end);
             }
             
             // Render the formatted span
-            match span.format {
+            let (content, is_bold, is_italic, is_code) = match span.format {
                 InlineFormat::Bold => {
-                    let content = &self.text[span.range.start + 2..span.range.end - 2];
-                    self.draw_text_bold.draw_walk(cx, Walk::fit(), Align::default(), content);
+                    let content = &text_clone[span.range.start + 2..span.range.end - 2];
+                    (content, true, false, false)
                 }
                 InlineFormat::Italic => {
-                    let content = &self.text[span.range.start + 1..span.range.end - 1];
-                    self.draw_text_italic.draw_walk(cx, Walk::fit(), Align::default(), content);
+                    let content = &text_clone[span.range.start + 1..span.range.end - 1];
+                    (content, false, true, false)
                 }
                 InlineFormat::Code => {
-                    let content = &self.text[span.range.start + 1..span.range.end - 1];
-                    self.draw_text_code.draw_walk(cx, Walk::fit(), Align::default(), content);
+                    let content = &text_clone[span.range.start + 1..span.range.end - 1];
+                    (content, false, false, true)
                 }
-            }
+            };
             
+            current_x = self.render_formatted_segment(cx, content, current_x, span.range.start, is_bold, is_italic, is_code);
             last_end = span.range.end;
         }
         
         // Render remaining text
-        if last_end < self.text.len() {
-            self.draw_text.draw_walk(cx, Walk::fit(), Align::default(), &self.text[last_end..]);
+        if last_end < text_clone.len() {
+            self.render_text_segment(cx, &text_clone[last_end..], current_x, last_end);
         }
     }
     
+    fn render_text_segment(&mut self, cx: &mut Cx2d, text: &str, start_x: f64, char_offset: usize) -> f64 {
+        let mut x = start_x;
+        
+        // Record position for each character
+        for (i, _) in text.char_indices() {
+            self.text_positions.push((char_offset + i, x));
+            x += 8.0; // Rough estimate for 14px font
+        }
+        
+        // Draw the text
+        self.draw_text.draw_walk(cx, Walk::fit(), Align::default(), text);
+        x
+    }
+    
+    fn render_formatted_segment(&mut self, cx: &mut Cx2d, text: &str, start_x: f64, char_offset: usize, is_bold: bool, is_italic: bool, is_code: bool) -> f64 {
+        let mut x = start_x;
+        
+        // Record position for each character
+        for (i, _) in text.char_indices() {
+            self.text_positions.push((char_offset + i, x));
+            x += 8.0;
+        }
+        
+        // Draw with appropriate style
+        if is_bold {
+            self.draw_text_bold.draw_walk(cx, Walk::fit(), Align::default(), text);
+        } else if is_italic {
+            self.draw_text_italic.draw_walk(cx, Walk::fit(), Align::default(), text);
+        } else if is_code {
+            self.draw_text_code.draw_walk(cx, Walk::fit(), Align::default(), text);
+        }
+        
+        x
+    }
+    
+    fn find_cursor_position_from_x(&self, click_x: f64) -> usize {
+        if self.text_positions.is_empty() {
+            return 0;
+        }
+        
+        // Find closest character position
+        let mut best_pos = 0;
+        let mut best_distance = f64::MAX;
+        
+        for &(char_idx, x_pos) in &self.text_positions {
+            let distance = (click_x - x_pos).abs();
+            if distance < best_distance {
+                best_distance = distance;
+                best_pos = char_idx;
+            }
+        }
+        
+        // Check if click is after the last character
+        if let Some(&(_, last_x)) = self.text_positions.last() {
+            if click_x > last_x + 4.0 { // Half character width
+                return self.text.len();
+            }
+        }
+        
+        best_pos.min(self.text.len())
+    }
+    
     fn draw_cursor_at_position(&mut self, cx: &mut Cx2d) {
-        // Simple cursor at end for now
+        let cursor_x = if let Some(&(_, x_pos)) = self.text_positions.iter().find(|(idx, _)| *idx == self.cursor_pos) {
+            x_pos
+        } else if self.cursor_pos >= self.text.len() && !self.text_positions.is_empty() {
+            // Cursor at end
+            self.text_positions.last().unwrap().1 + 8.0
+        } else {
+            0.0
+        };
+        
         let cursor_walk = Walk {
             width: Size::Fixed(2.0),
             height: Size::Fixed(20.0),
+            margin: Margin { left: cursor_x, ..Margin::default() },
             ..Walk::default()
         };
         self.draw_cursor.draw_walk(cx, cursor_walk);
