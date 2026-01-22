@@ -216,15 +216,14 @@ Task 10: Raccourcis clavier pour formatage (Ctrl+B, Ctrl+I)
 - **Demo**: ✅ Listes numérotées simples fonctionnelles, indentation reportée
 
 **Task 13: Système de sauvegarde fichiers markdown**
-- Créer module
-Storage avec trait pour abstraction
-- Implémenter LocalStorage
- pour fichiers .md
-- Sérialiser blocs en markdown standard
-- Parser fichier .md en blocs au chargement
-- Implémenter sauvegarde manuelle (Ctrl+S)
-- **Tests**: Sauvegarder document, recharger, vérifier intégrité
-- **Demo**: Éditer, sauvegarder, fermer, rouvrir - contenu préservé
+- ✅ Créer module Storage avec trait pour abstraction
+- ✅ Implémenter LocalStorage pour fichiers .md
+- ✅ Sérialiser blocs en markdown standard
+- ✅ Parser fichier .md en blocs au chargement
+- ✅ Implémenter sauvegarde manuelle (Ctrl+S)
+- ✅ Implémenter chargement de fichier (Ctrl+O)
+- **Tests**: ✅ Sauvegarder document, recharger, vérifier intégrité
+- **Demo**: ✅ Éditer, sauvegarder, fermer, rouvrir - contenu préservé
 
 **Task 14: Auto-save avec debounce**
 - Implémenter timer avec debounce (5s par défaut)

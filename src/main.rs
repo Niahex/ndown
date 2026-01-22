@@ -6,6 +6,7 @@ pub mod block_editor;
 pub mod templates;
 pub mod markdown;
 pub mod ui;
+pub mod storage;
 
 fn main() {
     logger::init();

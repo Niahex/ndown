@@ -1,9 +1,12 @@
 use crate::block::Block;
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct EditorState {
     blocks: Vec<Block>,
     active_block_index: usize,
+    current_file: Option<PathBuf>,
+    is_modified: bool,
 }
 
 impl Default for EditorState {
@@ -11,6 +14,8 @@ impl Default for EditorState {
         Self {
             blocks: vec![Block::text(String::new())],
             active_block_index: 0,
+            current_file: None,
+            is_modified: false,
         }
     }
 }
@@ -43,6 +48,7 @@ impl EditorState {
     pub fn create_block(&mut self, index: usize, block: Block) {
         if index <= self.blocks.len() {
             self.blocks.insert(index, block);
+            self.is_modified = true;
             ::log::debug!("Created block at index {}", index);
         }
     }
@@ -53,6 +59,7 @@ impl EditorState {
             if self.active_block_index >= self.blocks.len() {
                 self.active_block_index = self.blocks.len().saturating_sub(1);
             }
+            self.is_modified = true;
             ::log::debug!("Deleted block at index {}", index);
             Some(block)
         } else {
@@ -72,6 +79,27 @@ impl EditorState {
             self.active_block_index += 1;
             ::log::debug!("Moved to next block: {}", self.active_block_index);
         }
+    }
+
+    // File operations
+    pub fn current_file(&self) -> Option<&PathBuf> {
+        self.current_file.as_ref()
+    }
+
+    pub fn set_current_file(&mut self, path: PathBuf) {
+        self.current_file = Some(path);
+    }
+
+    pub fn is_modified(&self) -> bool {
+        self.is_modified
+    }
+
+    pub fn mark_saved(&mut self) {
+        self.is_modified = false;
+    }
+
+    pub fn mark_modified(&mut self) {
+        self.is_modified = true;
     }
 
     pub fn prev_block(&mut self) {

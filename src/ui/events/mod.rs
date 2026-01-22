@@ -27,7 +27,7 @@ impl EventHandler {
     }
 
     pub fn handle_text_changed(&mut self, block_id: usize, text: String, editor_state: &mut EditorState) {
-        if let Some(block) = editor_state.blocks_mut().get_mut(block_id) {
+        let (old_content, should_recreate) = if let Some(block) = editor_state.blocks_mut().get_mut(block_id) {
             let old_content = block.content.clone();
             block.content = text.clone();
             
@@ -39,15 +39,28 @@ impl EventHandler {
             let was_list = is_list_item(&old_content);
             let is_list = is_list_item(&text);
             
-            if old_level != new_level || was_list != is_list {
+            let should_recreate = if old_level != new_level || was_list != is_list {
                 // Update block type
                 if detect_list_item(&text).is_some() {
                     block.block_type = BlockType::List;
                 } else {
                     block.block_type = BlockType::Text;
                 }
-                self.blocks_to_recreate.push(block_id);
-            }
+                true
+            } else {
+                false
+            };
+            
+            (old_content, should_recreate)
+        } else {
+            return;
+        };
+        
+        // Mark as modified after releasing the mutable borrow
+        editor_state.mark_modified();
+        
+        if should_recreate {
+            self.blocks_to_recreate.push(block_id);
         }
     }
 
@@ -110,7 +123,7 @@ impl EventHandler {
 
     pub fn handle_tab_key(&mut self, block_id: usize, shift_pressed: bool, editor_state: &mut EditorState) -> bool {
         // First, get the list info and previous main number before borrowing mutably
-        let (list_info, prev_main_num) = if let Some(block) = editor_state.blocks().get(block_id) {
+        let (list_info, _prev_main_num) = if let Some(block) = editor_state.blocks().get(block_id) {
             if let Some(list_info) = detect_list_item(&block.content) {
                 let prev_main_num = if list_info.list_type == ListType::Ordered && !shift_pressed {
                     self.find_previous_main_number(block_id, editor_state)

@@ -2,6 +2,8 @@ use makepad_widgets::*;
 use makepad_widgets::text_input::TextInputAction;
 use crate::editor_state::EditorState;
 use crate::ui::{EventHandler, BlockRenderer};
+use crate::storage::{Storage, LocalStorage};
+use std::path::PathBuf;
 
 live_design! {
     use link::theme::*;
@@ -159,6 +161,7 @@ pub struct BlockEditor {
     #[rust] pub editor_state: EditorState,
     #[rust] renderer: BlockRenderer,
     #[rust] event_handler: EventHandler,
+    #[rust] storage: LocalStorage,
 }
 
 impl LiveHook for BlockEditor {
@@ -233,6 +236,15 @@ impl Widget for BlockEditor {
                             return;
                         }
                     }
+                }
+                KeyCode::KeyS if ke.modifiers.control => {
+                    self.save_file();
+                }
+                KeyCode::KeyO if ke.modifiers.control => {
+                    // For now, load the untitled.md file as a test
+                    let path = PathBuf::from("untitled.md");
+                    self.load_file(path);
+                    cx.redraw_all();
                 }
                 _ => {}
             }
@@ -314,5 +326,43 @@ impl Widget for BlockEditor {
         
         cx.end_turtle_with_area(&mut self.area);
         DrawStep::done()
+    }
+}
+
+impl BlockEditor {
+    fn save_file(&mut self) {
+        let path = if let Some(current_file) = self.editor_state.current_file() {
+            current_file.clone()
+        } else {
+            // Default file name for new documents
+            PathBuf::from("untitled.md")
+        };
+        
+        match self.storage.save_blocks(&path, self.editor_state.blocks()) {
+            Ok(()) => {
+                self.editor_state.mark_saved();
+                self.editor_state.set_current_file(path.clone());
+                ::log::info!("File saved: {:?}", path);
+            }
+            Err(e) => {
+                ::log::error!("Failed to save file: {}", e);
+            }
+        }
+    }
+    
+    pub fn load_file(&mut self, path: PathBuf) {
+        match self.storage.load_blocks(&path) {
+            Ok(blocks) => {
+                *self.editor_state.blocks_mut() = blocks;
+                self.editor_state.set_current_file(path.clone());
+                self.editor_state.mark_saved();
+                self.editor_state.set_active_block(0);
+                self.renderer.clear_items();
+                ::log::info!("File loaded: {:?}", path);
+            }
+            Err(e) => {
+                ::log::error!("Failed to load file: {}", e);
+            }
+        }
     }
 }
