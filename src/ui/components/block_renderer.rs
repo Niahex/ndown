@@ -47,6 +47,7 @@ impl BlockRenderer {
             BlockType::Heading(level) => {
                 format!("{} {}", "#".repeat(*level as usize), block.content)
             }
+            BlockType::List => block.content.clone(),
         };
         
         let template_id = get_template_for_block(&content, is_active);

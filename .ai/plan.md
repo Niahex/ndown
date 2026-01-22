@@ -196,16 +196,14 @@ Task 10: Raccourcis clavier pour formatage (Ctrl+B, Ctrl+I)
 - **Demo**: Formatage rapide au clavier fonctionnel
 
 **Task 11: Plugin List - listes à puces basiques**
-- Créer
-ListBlockPlugin pour listes à puces
-- Parsing: détecter -  au début
-- Conversion automatique: taper -
- transforme en liste
-- Auto-continuation: Enter dans liste crée nouvel item
-- Double Enter sort de la liste
-- Puce vide + Enter = retour texte normal
-- **Tests**: Créer listes, auto-continuation, sortie de liste
-- **Demo**: Listes à puces fonctionnelles avec comportements intelligents
+- ✅ Créer ListBlockPlugin pour listes à puces
+- ✅ Parsing: détecter -  au début
+- ✅ Conversion automatique: taper -  transforme en liste
+- ✅ Auto-continuation: Enter dans liste crée nouvel item
+- ✅ Double Enter sort de la liste
+- ✅ Puce vide + Enter = retour texte normal
+- **Tests**: ✅ Créer listes, auto-continuation, sortie de liste
+- **Demo**: ✅ Listes à puces fonctionnelles avec comportements intelligents
 
 **Task 12: Listes numérotées et indentation**
 - Ajouter support listes numérotées (

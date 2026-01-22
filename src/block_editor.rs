@@ -92,6 +92,45 @@ live_design! {
         }
     }
     
+    // List templates
+    BlockInputList = <TextInput> {
+        width: Fill, height: Fit, padding: 10
+        draw_bg: { color: #2a2a2a }
+        draw_text: {
+            text_style: <THEME_FONT_REGULAR> {font_size: 14}
+            color: #ffffff
+        }
+    }
+    
+    BlockInputInactiveList = <TextInput> {
+        width: Fill, height: Fit, padding: 10
+        is_read_only: true
+        draw_bg: { color: #1a1a1a }
+        draw_text: {
+            text_style: <THEME_FONT_REGULAR> {font_size: 14}
+            color: #cccccc
+        }
+    }
+    
+    BlockInputOrderedList = <TextInput> {
+        width: Fill, height: Fit, padding: 10
+        draw_bg: { color: #2a2a2a }
+        draw_text: {
+            text_style: <THEME_FONT_REGULAR> {font_size: 14}
+            color: #ffffff
+        }
+    }
+    
+    BlockInputInactiveOrderedList = <TextInput> {
+        width: Fill, height: Fit, padding: 10
+        is_read_only: true
+        draw_bg: { color: #1a1a1a }
+        draw_text: {
+            text_style: <THEME_FONT_REGULAR> {font_size: 14}
+            color: #cccccc
+        }
+    }
+    
     pub BlockEditor = {{BlockEditor}} {
         width: Fill, height: Fill
         flow: Down, spacing: 5
@@ -105,6 +144,10 @@ live_design! {
         BlockInputInactiveH1 = <BlockInputInactiveH1> {}
         BlockInputInactiveH2 = <BlockInputInactiveH2> {}
         BlockInputInactiveH3 = <BlockInputInactiveH3> {}
+        BlockInputList = <BlockInputList> {}
+        BlockInputInactiveList = <BlockInputInactiveList> {}
+        BlockInputOrderedList = <BlockInputOrderedList> {}
+        BlockInputInactiveOrderedList = <BlockInputInactiveOrderedList> {}
     }
 }
 
@@ -162,6 +205,27 @@ impl Widget for BlockEditor {
             }
         }
         
+        // Handle global key events before TextInput processes them
+        if let Event::KeyDown(ke) = event {
+            match ke.key_code {
+                KeyCode::ReturnKey if !ke.modifiers.shift => {
+                    let active_index = self.editor_state.active_block_index();
+                    self.event_handler.handle_enter_key(active_index, &self.editor_state);
+                }
+                KeyCode::Tab => {
+                    let active_index = self.editor_state.active_block_index();
+                    if self.event_handler.handle_tab_key(active_index, ke.modifiers.shift, &mut self.editor_state) {
+                        // Keep focus on current block after tab
+                        if let Some(item) = self.renderer.items_iter_mut().find(|(idx, _)| **idx == active_index) {
+                            item.1.set_key_focus(cx);
+                        }
+                        cx.redraw_all();
+                    }
+                }
+                _ => {}
+            }
+        }
+        
         // Apply changes
         for block_id in &self.event_handler.blocks_to_recreate {
             self.renderer.remove_item(block_id);
@@ -175,30 +239,29 @@ impl Widget for BlockEditor {
             return;
         }
         
+        // Handle new block creation
+        if let Some((insert_index, content)) = &self.event_handler.should_create_new_block {
+            let block_type = if crate::markdown::parser::is_list_item(content) {
+                crate::block::BlockType::List
+            } else {
+                crate::block::BlockType::Text
+            };
+            
+            let new_block = crate::block::Block::new(block_type, content.clone());
+            self.editor_state.create_block(*insert_index, new_block);
+            self.editor_state.set_active_block(*insert_index);
+            
+            self.renderer.clear_items();
+            cx.redraw_all();
+            return;
+        }
+        
         if let Some(new_active) = self.event_handler.navigation_target {
             let old_active = self.editor_state.active_block_index();
             self.editor_state.set_active_block(new_active);
             self.renderer.remove_item(&old_active);
             self.renderer.remove_item(&new_active);
             cx.redraw_all();
-        }
-        
-        // Handle global shortcuts
-        if let Event::KeyDown(ke) = event {
-            match ke.key_code {
-                KeyCode::ReturnKey if !ke.modifiers.shift => {
-                    let old_active = self.editor_state.active_block_index();
-                    let new_index = old_active + 1;
-                    
-                    self.editor_state.create_block(new_index, crate::block::Block::text(String::new()));
-                    self.editor_state.set_active_block(new_index);
-                    
-                    self.renderer.remove_item(&old_active);
-                    self.renderer.remove_item(&new_index);
-                    cx.redraw_all();
-                }
-                _ => {}
-            }
         }
     }
     

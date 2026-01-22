@@ -15,6 +15,7 @@ impl BlockId {
 pub enum BlockType {
     Text,
     Heading(u8), // 1-5 for h1-h5
+    List,
 }
 
 #[derive(Debug, Clone)]
@@ -39,5 +40,9 @@ impl Block {
 
     pub fn heading(level: u8, content: String) -> Self {
         Self::new(BlockType::Heading(level), content)
+    }
+
+    pub fn list(content: String) -> Self {
+        Self::new(BlockType::List, content)
     }
 }
