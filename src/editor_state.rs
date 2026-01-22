@@ -23,6 +23,10 @@ impl EditorState {
     pub fn blocks(&self) -> &[Block] {
         &self.blocks
     }
+    
+    pub fn blocks_mut(&mut self) -> &mut Vec<Block> {
+        &mut self.blocks
+    }
 
     pub fn active_block_index(&self) -> usize {
         self.active_block_index
