@@ -27,7 +27,7 @@ impl EventHandler {
     }
 
     pub fn handle_text_changed(&mut self, block_id: usize, text: String, editor_state: &mut EditorState) {
-        let (old_content, should_recreate) = if let Some(block) = editor_state.blocks_mut().get_mut(block_id) {
+        let (_old_content, should_recreate) = if let Some(block) = editor_state.blocks_mut().get_mut(block_id) {
             let old_content = block.content.clone();
             block.content = text.clone();
             

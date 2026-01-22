@@ -3,6 +3,7 @@ use makepad_widgets::text_input::TextInputAction;
 use crate::editor_state::EditorState;
 use crate::ui::{EventHandler, BlockRenderer};
 use crate::storage::{Storage, LocalStorage};
+use crate::ui::components::inline_formatter::InlineFormatter;
 use std::path::PathBuf;
 
 live_design! {
@@ -246,6 +247,12 @@ impl Widget for BlockEditor {
                     self.load_file(path);
                     cx.redraw_all();
                 }
+                KeyCode::KeyB if ke.modifiers.control => {
+                    self.toggle_bold(cx);
+                }
+                KeyCode::KeyI if ke.modifiers.control => {
+                    self.toggle_italic(cx);
+                }
                 _ => {}
             }
         }
@@ -363,6 +370,54 @@ impl BlockEditor {
             Err(e) => {
                 ::log::error!("Failed to load file: {}", e);
             }
+        }
+    }
+    
+    fn toggle_bold(&mut self, cx: &mut Cx) {
+        let active_index = self.editor_state.active_block_index();
+        if let Some(item) = self.renderer.items_iter_mut().find(|(idx, _)| **idx == active_index) {
+            let text_input = item.1.as_text_input();
+            let current_text = text_input.text();
+            let cursor = text_input.cursor().index;
+            
+            let (new_text, new_cursor) = InlineFormatter::toggle_bold(&current_text, cursor);
+            text_input.set_text(cx, &new_text);
+            text_input.set_cursor(cx, makepad_draw::text::selection::Cursor {
+                index: new_cursor,
+                prefer_next_row: false,
+            }, false);
+            
+            // Update the block content
+            if let Some(block) = self.editor_state.blocks_mut().get_mut(active_index) {
+                block.content = new_text;
+                self.editor_state.mark_modified();
+            }
+            
+            item.1.redraw(cx);
+        }
+    }
+    
+    fn toggle_italic(&mut self, cx: &mut Cx) {
+        let active_index = self.editor_state.active_block_index();
+        if let Some(item) = self.renderer.items_iter_mut().find(|(idx, _)| **idx == active_index) {
+            let text_input = item.1.as_text_input();
+            let current_text = text_input.text();
+            let cursor = text_input.cursor().index;
+            
+            let (new_text, new_cursor) = InlineFormatter::toggle_italic(&current_text, cursor);
+            text_input.set_text(cx, &new_text);
+            text_input.set_cursor(cx, makepad_draw::text::selection::Cursor {
+                index: new_cursor,
+                prefer_next_row: false,
+            }, false);
+            
+            // Update the block content
+            if let Some(block) = self.editor_state.blocks_mut().get_mut(active_index) {
+                block.content = new_text;
+                self.editor_state.mark_modified();
+            }
+            
+            item.1.redraw(cx);
         }
     }
 }

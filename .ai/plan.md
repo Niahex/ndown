@@ -181,19 +181,18 @@ Task 8: Plugin Heading avec parsing basique
 - **Demo**: Éditeur avec titres de différentes tailles visuellement distincts
 
 Task 9: Parser markdown inline - gras, italique, code
-- Créer module parser pour formatage inline
-- Implémenter détection **gras**, *italique*,  code
-- Intégrer rendu inline dans BlockView
-- **Tests**: Parser différentes combinaisons de formatage
-- **Demo**: Texte avec formatage inline rendu correctement
+- ✅ Créer module parser pour formatage inline
+- ✅ Implémenter détection **gras**, *italique*, `code`
+- ❌ Intégrer rendu inline dans BlockView (reporté - nécessite TextFlow)
+- **Tests**: ✅ Parser différentes combinaisons de formatage
+- **Demo**: ❌ Texte avec formatage inline rendu correctement (reporté)
 
 Task 10: Raccourcis clavier pour formatage (Ctrl+B, Ctrl+I)
-- Implémenter Ctrl+B: wrap sélection avec **, toggle si déjà formaté, insert si curseur seul
-- Implémenter Ctrl+I: même logique avec *
-- Implémenter Ctrl+
- pour code inline
-- **Tests**: Tester wrap, toggle, insert pour chaque raccourci
-- **Demo**: Formatage rapide au clavier fonctionnel
+- ✅ Implémenter Ctrl+B: wrap sélection avec **, toggle si déjà formaté, insert si curseur seul
+- ✅ Implémenter Ctrl+I: même logique avec *
+- ❌ Implémenter Ctrl+` pour code inline (reporté)
+- **Tests**: ✅ Tester wrap, toggle, insert pour chaque raccourci
+- **Demo**: ✅ Formatage rapide au clavier fonctionnel (marqueurs ajoutés)
 
 **Task 11: Plugin List - listes à puces basiques**
 - ✅ Créer ListBlockPlugin pour listes à puces
