@@ -5,6 +5,9 @@ pub enum InlineFormat {
     Bold,
     Italic,
     Code,
+    Link { text: String, url: String },
+    WikiLink { text: String },
+    Image { alt: String, url: String },
 }
 
 #[derive(Debug, Clone)]
@@ -19,6 +22,42 @@ pub fn parse_inline_formatting(text: &str) -> Vec<InlineSpan> {
     let mut i = 0;
     
     while i < chars.len() {
+        // Check for ![alt](url) - Images
+        if i + 1 < chars.len() && chars[i] == '!' && chars[i + 1] == '[' {
+            if let Some((end, alt, url)) = find_image_link(&chars, i) {
+                spans.push(InlineSpan {
+                    range: i..end,
+                    format: InlineFormat::Image { alt, url },
+                });
+                i = end;
+                continue;
+            }
+        }
+        
+        // Check for [[wiki]] - Wiki links
+        if i + 1 < chars.len() && chars[i] == '[' && chars[i + 1] == '[' {
+            if let Some((end, text)) = find_wiki_link(&chars, i) {
+                spans.push(InlineSpan {
+                    range: i..end,
+                    format: InlineFormat::WikiLink { text },
+                });
+                i = end;
+                continue;
+            }
+        }
+        
+        // Check for [text](url) - Links
+        if chars[i] == '[' {
+            if let Some((end, text, url)) = find_markdown_link(&chars, i) {
+                spans.push(InlineSpan {
+                    range: i..end,
+                    format: InlineFormat::Link { text, url },
+                });
+                i = end;
+                continue;
+            }
+        }
+        
         // Check for **bold**
         if i + 1 < chars.len() && chars[i] == '*' && chars[i + 1] == '*' {
             if let Some(end) = find_closing_pattern(&chars, i + 2, "**") {
@@ -82,6 +121,59 @@ fn find_closing_char(chars: &[char], start: usize, closing: char) -> Option<usiz
     None
 }
 
+fn find_image_link(chars: &[char], start: usize) -> Option<(usize, String, String)> {
+    // ![alt](url)
+    if start + 3 >= chars.len() || chars[start] != '!' || chars[start + 1] != '[' {
+        return None;
+    }
+    
+    let alt_end = find_closing_char(chars, start + 2, ']')?;
+    if alt_end + 1 >= chars.len() || chars[alt_end + 1] != '(' {
+        return None;
+    }
+    
+    let url_end = find_closing_char(chars, alt_end + 2, ')')?;
+    
+    let alt: String = chars[start + 2..alt_end].iter().collect();
+    let url: String = chars[alt_end + 2..url_end].iter().collect();
+    
+    Some((url_end + 1, alt, url))
+}
+
+fn find_wiki_link(chars: &[char], start: usize) -> Option<(usize, String)> {
+    // [[text]]
+    if start + 3 >= chars.len() || chars[start] != '[' || chars[start + 1] != '[' {
+        return None;
+    }
+    
+    for i in start + 2..chars.len() - 1 {
+        if chars[i] == ']' && chars[i + 1] == ']' {
+            let text: String = chars[start + 2..i].iter().collect();
+            return Some((i + 2, text));
+        }
+    }
+    None
+}
+
+fn find_markdown_link(chars: &[char], start: usize) -> Option<(usize, String, String)> {
+    // [text](url)
+    if start >= chars.len() || chars[start] != '[' {
+        return None;
+    }
+    
+    let text_end = find_closing_char(chars, start + 1, ']')?;
+    if text_end + 1 >= chars.len() || chars[text_end + 1] != '(' {
+        return None;
+    }
+    
+    let url_end = find_closing_char(chars, text_end + 2, ')')?;
+    
+    let text: String = chars[start + 1..text_end].iter().collect();
+    let url: String = chars[text_end + 2..url_end].iter().collect();
+    
+    Some((url_end + 1, text, url))
+}
+
 pub fn extract_plain_text(text: &str) -> String {
     let spans = parse_inline_formatting(text);
     let mut result = String::new();
@@ -96,6 +188,9 @@ pub fn extract_plain_text(text: &str) -> String {
             InlineFormat::Bold => &text[span.range.start + 2..span.range.end - 2],
             InlineFormat::Italic => &text[span.range.start + 1..span.range.end - 1],
             InlineFormat::Code => &text[span.range.start + 1..span.range.end - 1],
+            InlineFormat::Link { ref text, .. } => text,
+            InlineFormat::WikiLink { ref text } => text,
+            InlineFormat::Image { ref alt, .. } => alt,
         };
         result.push_str(content);
         

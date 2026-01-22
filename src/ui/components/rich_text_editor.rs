@@ -1,6 +1,5 @@
 use makepad_widgets::*;
 use crate::markdown::inline::{parse_inline_formatting, InlineFormat};
-use std::time::Instant;
 
 live_design! {
     RichTextEditorBase = {{RichTextEditor}} {
@@ -41,6 +40,20 @@ live_design! {
             }
         }
         
+        draw_text_link: {
+            text_style: <THEME_FONT_REGULAR> {font_size: 14}
+            fn get_color(self) -> vec4 {
+                return #5e81ac; // Blue for links
+            }
+        }
+        
+        draw_text_wiki: {
+            text_style: <THEME_FONT_REGULAR> {font_size: 14}
+            fn get_color(self) -> vec4 {
+                return #a3be8c; // Green for wiki links
+            }
+        }
+        
         draw_cursor: {
             fn pixel(self) -> vec4 {
                 return #ffffff;
@@ -66,6 +79,8 @@ pub struct RichTextEditor {
     #[live] draw_text_bold: DrawText,
     #[live] draw_text_italic: DrawText,
     #[live] draw_text_code: DrawText,
+    #[live] draw_text_link: DrawText,
+    #[live] draw_text_wiki: DrawText,
     #[live] draw_cursor: DrawQuad,
     #[live] draw_selection: DrawQuad,
     
@@ -160,8 +175,17 @@ impl Widget for RichTextEditor {
                         if self.has_selection() {
                             self.delete_selection();
                         }
-                        self.text.insert(self.cursor_pos, '\n');
-                        self.cursor_pos += 1;
+                        
+                        if ke.modifiers.shift {
+                            // Shift+Enter: line break within block
+                            self.text.insert(self.cursor_pos, '\n');
+                            self.cursor_pos += 1;
+                        } else {
+                            // Enter: new block (handled by parent)
+                            // For now, just insert newline - parent will handle block creation
+                            self.text.insert(self.cursor_pos, '\n');
+                            self.cursor_pos += 1;
+                        }
                         cx.redraw_all();
                     }
                     KeyCode::Backspace => {
@@ -507,22 +531,27 @@ impl RichTextEditor {
             }
             
             // Render the formatted span
-            let (content, is_bold, is_italic, is_code) = match span.format {
+            let (content, format) = match &span.format {
                 InlineFormat::Bold => {
                     let content = &text_clone[span.range.start + 2..span.range.end - 2];
-                    (content, true, false, false)
+                    (content, &span.format)
                 }
                 InlineFormat::Italic => {
                     let content = &text_clone[span.range.start + 1..span.range.end - 1];
-                    (content, false, true, false)
+                    (content, &span.format)
                 }
                 InlineFormat::Code => {
                     let content = &text_clone[span.range.start + 1..span.range.end - 1];
-                    (content, false, false, true)
+                    (content, &span.format)
+                }
+                InlineFormat::Link { .. } | InlineFormat::WikiLink { .. } | InlineFormat::Image { .. } => {
+                    // For links and images, use the whole span
+                    let content = &text_clone[span.range.start..span.range.end];
+                    (content, &span.format)
                 }
             };
             
-            current_x = self.render_formatted_segment(cx, content, current_x, span.range.start, is_bold, is_italic, is_code);
+            current_x = self.render_formatted_segment(cx, content, current_x, span.range.start, format);
             last_end = span.range.end;
         }
         
@@ -546,7 +575,7 @@ impl RichTextEditor {
         x
     }
     
-    fn render_formatted_segment(&mut self, cx: &mut Cx2d, text: &str, start_x: f64, char_offset: usize, is_bold: bool, is_italic: bool, is_code: bool) -> f64 {
+    fn render_formatted_segment(&mut self, cx: &mut Cx2d, text: &str, start_x: f64, char_offset: usize, format: &InlineFormat) -> f64 {
         let mut x = start_x;
         
         // Record position for each character
@@ -556,12 +585,27 @@ impl RichTextEditor {
         }
         
         // Draw with appropriate style
-        if is_bold {
-            self.draw_text_bold.draw_walk(cx, Walk::fit(), Align::default(), text);
-        } else if is_italic {
-            self.draw_text_italic.draw_walk(cx, Walk::fit(), Align::default(), text);
-        } else if is_code {
-            self.draw_text_code.draw_walk(cx, Walk::fit(), Align::default(), text);
+        match format {
+            InlineFormat::Bold => {
+                self.draw_text_bold.draw_walk(cx, Walk::fit(), Align::default(), text);
+            }
+            InlineFormat::Italic => {
+                self.draw_text_italic.draw_walk(cx, Walk::fit(), Align::default(), text);
+            }
+            InlineFormat::Code => {
+                self.draw_text_code.draw_walk(cx, Walk::fit(), Align::default(), text);
+            }
+            InlineFormat::Link { text: link_text, url: _ } => {
+                self.draw_text_link.draw_walk(cx, Walk::fit(), Align::default(), link_text);
+            }
+            InlineFormat::WikiLink { text: wiki_text } => {
+                self.draw_text_wiki.draw_walk(cx, Walk::fit(), Align::default(), wiki_text);
+            }
+            InlineFormat::Image { alt, url: _ } => {
+                // For now, just show alt text with special styling
+                let display_text = format!("[IMG: {}]", alt);
+                self.draw_text_code.draw_walk(cx, Walk::fit(), Align::default(), &display_text);
+            }
         }
         
         x

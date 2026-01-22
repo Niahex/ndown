@@ -53,6 +53,87 @@ pub fn detect_numbered_list(content: &str) -> bool {
         && trimmed.contains(". ")
 }
 
+pub fn detect_blockquote(content: &str) -> Option<BlockQuoteInfo> {
+    let trimmed = content.trim_start();
+    if !trimmed.starts_with('>') {
+        return None;
+    }
+    
+    let mut level = 0;
+    let mut chars = trimmed.chars();
+    
+    while let Some(ch) = chars.next() {
+        if ch == '>' {
+            level += 1;
+        } else if ch == ' ' {
+            break;
+        } else {
+            break;
+        }
+    }
+    
+    if level > 0 {
+        let content_start = trimmed.find(|c: char| c != '>' && c != ' ').unwrap_or(trimmed.len());
+        let content = trimmed[content_start..].to_string();
+        Some(BlockQuoteInfo { level, content })
+    } else {
+        None
+    }
+}
+
+pub fn detect_checkbox(content: &str) -> Option<CheckboxInfo> {
+    let trimmed = content.trim_start();
+    
+    if trimmed.starts_with("- [ ] ") {
+        Some(CheckboxInfo {
+            checked: false,
+            content: trimmed[6..].to_string(),
+        })
+    } else if trimmed.starts_with("- [x] ") || trimmed.starts_with("- [X] ") {
+        Some(CheckboxInfo {
+            checked: true,
+            content: trimmed[6..].to_string(),
+        })
+    } else {
+        None
+    }
+}
+
+pub fn detect_divider(content: &str) -> Option<DividerType> {
+    let trimmed = content.trim();
+    
+    if trimmed == "---" || trimmed.chars().all(|c| c == '-') && trimmed.len() >= 3 {
+        Some(DividerType::Simple)
+    } else if trimmed == "===" || trimmed.chars().all(|c| c == '=') && trimmed.len() >= 3 {
+        Some(DividerType::Double)
+    } else if trimmed == "-.-" || (trimmed.chars().enumerate().all(|(i, c)| {
+        if i % 2 == 0 { c == '-' } else { c == '.' }
+    }) && trimmed.len() >= 3) {
+        Some(DividerType::Dotted)
+    } else {
+        None
+    }
+}
+
+pub fn detect_code_block(content: &str) -> Option<CodeBlockInfo> {
+    let trimmed = content.trim_start();
+    
+    if trimmed.starts_with("```") {
+        let first_line = trimmed.lines().next().unwrap_or("");
+        let language = if first_line.len() > 3 {
+            Some(first_line[3..].trim().to_string())
+        } else {
+            None
+        };
+        
+        let content = trimmed.lines().skip(1).collect::<Vec<_>>().join("\n");
+        
+        Some(CodeBlockInfo { language, content })
+    } else {
+        None
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ListInfo {
     pub list_type: ListType,
@@ -65,4 +146,29 @@ pub struct ListInfo {
 pub enum ListType {
     Unordered,
     Ordered,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct BlockQuoteInfo {
+    pub level: usize,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CheckboxInfo {
+    pub checked: bool,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum DividerType {
+    Simple,    // ---
+    Double,    // ===
+    Dotted,    // -.-
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CodeBlockInfo {
+    pub language: Option<String>,
+    pub content: String,
 }

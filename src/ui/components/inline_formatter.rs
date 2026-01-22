@@ -27,6 +27,9 @@ impl InlineFormatter {
                     InlineFormat::Bold => &text[span.range.start + 2..span.range.end - 2],
                     InlineFormat::Italic => &text[span.range.start + 1..span.range.end - 1],
                     InlineFormat::Code => &text[span.range.start + 1..span.range.end - 1],
+                    InlineFormat::Link { ref text, .. } => text,
+                    InlineFormat::WikiLink { ref text } => text,
+                    InlineFormat::Image { ref alt, .. } => alt,
                 };
                 let after = &text[span.range.end..];
                 

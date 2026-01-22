@@ -38,6 +38,22 @@ impl RichTextRenderer {
                     tf.fixed.pop();
                     content
                 }
+                InlineFormat::Link { ref text, .. } => {
+                    // Render link as regular text for now
+                    tf.draw_text(cx, text);
+                    text
+                }
+                InlineFormat::WikiLink { ref text } => {
+                    // Render wiki link as regular text for now
+                    tf.draw_text(cx, text);
+                    text
+                }
+                InlineFormat::Image { ref alt, .. } => {
+                    // Render image alt text for now
+                    let display = format!("[IMG: {}]", alt);
+                    tf.draw_text(cx, &display);
+                    alt
+                }
             };
             
             last_end = span.range.end;
