@@ -11,7 +11,7 @@ live_design! {
         flow: Down, padding: 10
         show_bg: true
         draw_bg: { color: #434c5e }
-        
+
         title = <Label> {
             margin: {bottom: 10}
             text: "EXPLORATEUR"
@@ -21,7 +21,7 @@ live_design! {
         file_list = <PortalList> {
             width: Fill, height: Fill
             flow: Down
-            
+
             // Le template doit être ICI
             FileItem = <View> {
                 width: Fill, height: 30, flow: Right, align: {y: 0.5}, padding: 5
@@ -34,7 +34,7 @@ live_design! {
                                 return mix(mix(self.color, #4c566a, self.hover), #3b4252, self.down);
                             }
                         }
-                        
+
                         animator: {
                             hover = {
                                 default: off
@@ -46,11 +46,11 @@ live_design! {
                                 off = { from: {all: Forward {duration: 0.1}} apply: { draw_bg: {down: 0.0} } }
                                 on = { from: {all: Forward {duration: 0.1}} apply: { draw_bg: {down: 1.0} } }
                             }
-                        }                
+                        }
                 icon = <Label> { text: "📄", draw_text: { color: #88c0d0 } }
-                name = <Label> { 
-                    text: "filename.md", 
-                    draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 11}, color: #d8dee9 } 
+                name = <Label> {
+                    text: "filename.md",
+                    draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 11}, color: #d8dee9 }
                 }
             }
         }
@@ -61,7 +61,7 @@ live_design! {
 pub struct FileExplorer {
     #[deref]
     view: View,
-    
+
     #[rust]
     files: Vec<String>,
 }
@@ -76,7 +76,7 @@ impl FileExplorer {
     fn load_files(&mut self) {
         let path = std::env::current_dir().unwrap_or(PathBuf::from("."));
         self.files.clear();
-        
+
         if let Ok(entries) = fs::read_dir(path) {
             for entry in entries {
                 if let Ok(entry) = entry {

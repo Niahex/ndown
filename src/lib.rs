@@ -11,7 +11,7 @@ pub mod top_bar;
 pub fn live_design(cx: &mut Cx) {
     makepad_widgets::live_design(cx);
     makepad_code_editor::live_design(cx);
-    
+
     editor::live_design(cx);
     file_explorer::live_design(cx);
     outline_panel::live_design(cx);
