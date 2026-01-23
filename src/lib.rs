@@ -3,6 +3,7 @@ use makepad_widgets::*;
 
 pub mod ui;
 pub mod app;
+pub mod model;
 
 pub fn live_design(cx: &mut Cx) {
     makepad_widgets::live_design(cx);
