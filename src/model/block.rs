@@ -21,21 +21,29 @@ impl Default for StyleBits {
     }
 }
 
-// Un intervalle de style. Les intervalles sont stockés à plat et contigus pour le rendu.
 #[derive(Clone, Debug)]
 pub struct StyleSpan {
-    pub len: usize, // Longueur en caractères
+    pub len: usize,
     pub style: StyleBits,
+}
+
+#[derive(Clone, Debug)]
+pub struct BlockLayoutCache {
+    pub height: f64,
+    pub width: f64,
+    // On pourrait stocker la position des glyphes ici pour le hit testing ultra-rapide
+    // Mais pour l'instant, height suffit pour le scrolling
 }
 
 #[derive(Clone, Debug)]
 pub struct Block {
     pub id: u64,
     pub ty: BlockType,
-    pub text: String, // Le texte brut visible (sans marqueurs Markdown)
-    pub styles: Vec<StyleSpan>, // La liste des styles appliqués séquentiellement
+    pub text: String,
+    pub styles: Vec<StyleSpan>,
     
-    pub height: f64,
+    // Cache
+    pub layout_cache: Option<BlockLayoutCache>, // Nouveau cache
     pub is_dirty: bool,
 }
 
@@ -46,7 +54,7 @@ impl Block {
             ty,
             text: text.to_string(),
             styles: vec![StyleSpan { len: text.chars().count(), style: StyleBits::default() }],
-            height: 0.0,
+            layout_cache: None,
             is_dirty: true,
         }
     }
@@ -59,24 +67,20 @@ impl Block {
         &self.text
     }
 
-    // Reconstruit le markdown en injectant les marqueurs aux frontières des styles
     pub fn write_markdown_to(&self, buf: &mut String) {
         let mut char_iter = self.text.chars();
         
         for span in &self.styles {
-            // Ouvrir les tags
             if span.style.is_code { buf.push('`'); }
             if span.style.is_bold { buf.push_str("**"); }
             if span.style.is_italic { buf.push('*'); }
             
-            // Écrire le texte du span
             for _ in 0..span.len {
                 if let Some(c) = char_iter.next() {
                     buf.push(c);
                 }
             }
             
-            // Fermer les tags (ordre inverse idéalement, mais simple ici pour MD)
             if span.style.is_italic { buf.push('*'); }
             if span.style.is_bold { buf.push_str("**"); }
             if span.style.is_code { buf.push('`'); }
@@ -91,5 +95,6 @@ impl Block {
     
     pub fn mark_dirty(&mut self) {
         self.is_dirty = true;
+        self.layout_cache = None; // Invalider le cache
     }
 }

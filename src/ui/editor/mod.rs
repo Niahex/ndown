@@ -417,7 +417,7 @@ impl Widget for EditorArea {
         
         let (used_height, hit_res) = view.draw_document(
             cx, 
-            &self.document, 
+            &mut self.document, 
             &self.layout, 
             rect, 
             (self.cursor_block, self.cursor_char),
