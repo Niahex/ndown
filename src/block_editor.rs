@@ -1,15 +1,15 @@
 use makepad_widgets::*;
-use makepad_widgets::text_input::TextInputAction;
 use crate::editor_state::EditorState;
 use crate::ui::{EventHandler, BlockRenderer};
 use crate::storage::{Storage, LocalStorage};
-use crate::rich_text_input::{RichTextInput, formatting::FormattingManager};
+use crate::rich_text_input::{RichTextInput, formatting::FormattingManager, RichTextInputAction};
 use std::path::PathBuf;
 
 live_design! {
     use link::theme::*;
     use link::shaders::*;
     use link::widgets::*;
+    use crate::rich_text_input::*;
     
     BlockLabelBase = <Label> {
         width: Fill, padding: 10
@@ -19,84 +19,128 @@ live_design! {
         }
     }
     
-    BlockInputBase = <TextInput> {
+    BlockInputBase = <RichTextInputBase> {
         width: Fill, height: Fit, padding: 10
-        draw_bg: { color: #2a2a2a }
+        draw_bg: { 
+            fn pixel(self) -> vec4 {
+                return #2a2a2a;
+            }
+        }
         draw_text: {
             text_style: <THEME_FONT_REGULAR> {font_size: 14}
-            color: #ffffff
+            fn get_color(self) -> vec4 {
+                return #ffffff;
+            }
         }
     }
     
-    BlockInputH1 = <TextInput> {
+    BlockInputH1 = <RichTextInputBase> {
         width: Fill, height: Fit, padding: 10
-        draw_bg: { color: #2a2a2a }
+        draw_bg: { 
+            fn pixel(self) -> vec4 {
+                return #2a2a2a;
+            }
+        }
         draw_text: {
             text_style: <THEME_FONT_REGULAR> {font_size: 25}
-            color: #ffffff
+            fn get_color(self) -> vec4 {
+                return #ffffff;
+            }
         }
     }
     
-    BlockInputH2 = <TextInput> {
+    BlockInputH2 = <RichTextInputBase> {
         width: Fill, height: Fit, padding: 10
-        draw_bg: { color: #2a2a2a }
+        draw_bg: { 
+            fn pixel(self) -> vec4 {
+                return #2a2a2a;
+            }
+        }
         draw_text: {
             text_style: <THEME_FONT_REGULAR> {font_size: 21}
-            color: #ffffff
+            fn get_color(self) -> vec4 {
+                return #ffffff;
+            }
         }
     }
     
-    BlockInputH3 = <TextInput> {
+    BlockInputH3 = <RichTextInputBase> {
         width: Fill, height: Fit, padding: 10
-        draw_bg: { color: #2a2a2a }
+        draw_bg: { 
+            fn pixel(self) -> vec4 {
+                return #2a2a2a;
+            }
+        }
         draw_text: {
             text_style: <THEME_FONT_REGULAR> {font_size: 18}
-            color: #ffffff
+            fn get_color(self) -> vec4 {
+                return #ffffff;
+            }
         }
     }
     
-    BlockInputInactive = <TextInput> {
+    BlockInputInactive = <RichTextInputBase> {
         width: Fill, height: Fit, padding: 10
-        is_read_only: true
-        draw_bg: { color: #1a1a1a }
+        draw_bg: { 
+            fn pixel(self) -> vec4 {
+                return #1a1a1a;
+            }
+        }
         draw_text: {
             text_style: <THEME_FONT_REGULAR> {font_size: 14}
-            color: #cccccc
+            fn get_color(self) -> vec4 {
+                return #cccccc;
+            }
         }
     }
     
-    BlockInputInactiveH1 = <TextInput> {
+    BlockInputInactiveH1 = <RichTextInputBase> {
         width: Fill, height: Fit, padding: 10
-        is_read_only: true
-        draw_bg: { color: #1a1a1a }
+        draw_bg: { 
+            fn pixel(self) -> vec4 {
+                return #1a1a1a;
+            }
+        }
         draw_text: {
             text_style: <THEME_FONT_REGULAR> {font_size: 25}
-            color: #cccccc
+            fn get_color(self) -> vec4 {
+                return #cccccc;
+            }
         }
     }
     
-    BlockInputInactiveH2 = <TextInput> {
+    BlockInputInactiveH2 = <RichTextInputBase> {
         width: Fill, height: Fit, padding: 10
-        is_read_only: true
-        draw_bg: { color: #1a1a1a }
+        draw_bg: { 
+            fn pixel(self) -> vec4 {
+                return #1a1a1a;
+            }
+        }
         draw_text: {
             text_style: <THEME_FONT_REGULAR> {font_size: 21}
-            color: #cccccc
+            fn get_color(self) -> vec4 {
+                return #cccccc;
+            }
         }
     }
     
-    BlockInputInactiveH3 = <TextInput> {
+    BlockInputInactiveH3 = <RichTextInputBase> {
         width: Fill, height: Fit, padding: 10
-        is_read_only: true
-        draw_bg: { color: #1a1a1a }
+        draw_bg: { 
+            fn pixel(self) -> vec4 {
+                return #1a1a1a;
+            }
+        }
         draw_text: {
             text_style: <THEME_FONT_REGULAR> {font_size: 18}
-            color: #cccccc
+            fn get_color(self) -> vec4 {
+                return #cccccc;
+            }
         }
     }
     
     // List templates
-    BlockInputList = <TextInput> {
+    BlockInputList = <RichTextInputBase> {
         width: Fill, height: Fit, padding: 10
         draw_bg: { color: #2a2a2a }
         draw_text: {
@@ -197,13 +241,13 @@ impl Widget for BlockEditor {
             for action in cx.capture_actions(|cx| item.handle_event(cx, event, scope)) {
                 if let Some(action) = action.as_widget_action() {
                     match action.cast() {
-                        TextInputAction::Changed(text) => {
+                        RichTextInputAction::Changed(text) => {
                             self.event_handler.handle_text_changed(block_id, text, &mut self.editor_state);
                         }
-                        TextInputAction::KeyFocus => {
+                        RichTextInputAction::KeyFocus => {
                             self.event_handler.handle_key_focus(block_id, &mut self.editor_state, item, cx);
                         }
-                        TextInputAction::KeyDownUnhandled(ke) => {
+                        RichTextInputAction::KeyDownUnhandled(ke) => {
                             self.event_handler.handle_navigation(block_id, ke.key_code, &self.editor_state);
                         }
                         _ => {}
@@ -212,7 +256,7 @@ impl Widget for BlockEditor {
             }
         }
         
-        // Handle global key events before TextInput processes them
+        // Handle global key events before RichTextInput processes them
         if let Event::KeyDown(ke) = event {
             match ke.key_code {
                 KeyCode::ReturnKey if !ke.modifiers.shift => {

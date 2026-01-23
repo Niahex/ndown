@@ -6,7 +6,8 @@ use crate::rich_text_input::{
     history::HistoryManager, 
     types::*, 
     formatting::FormattingManager,
-    text_mapping::TextMapping
+    text_mapping::TextMapping,
+    actions::RichTextInputAction
 };
 
 live_design! {
@@ -113,7 +114,8 @@ impl LiveHook for RichTextInput {
 }
 
 impl Widget for RichTextInput {
-    fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+        let uid = self.widget_uid();
         // Handle clipboard events
         match event {
             Event::TextCopy(tc) => {
@@ -137,16 +139,16 @@ impl Widget for RichTextInput {
         
         match event {
             Event::KeyDown(ke) => {
-                self.handle_key_down(cx, ke);
+                self.handle_key_down(cx, ke, uid, &scope.path);
             }
             Event::KeyUp(_ke) => {
                 self.events.stop_key_repeat(cx);
             }
             Event::TextInput(ti) => {
-                self.handle_text_input(cx, &ti.input);
+                self.handle_text_input(cx, &ti.input, uid, &scope.path);
             }
             Event::MouseDown(me) => {
-                self.handle_mouse_down(cx, me);
+                self.handle_mouse_down(cx, me, uid, &scope.path);
             }
             Event::MouseMove(me) => {
                 self.handle_mouse_move(cx, me);
@@ -210,7 +212,9 @@ impl RichTextInput {
     }
     
     // Event handlers
-    fn handle_key_down(&mut self, cx: &mut Cx, ke: &KeyEvent) {
+    fn handle_key_down(&mut self, cx: &mut Cx, ke: &KeyEvent, uid: WidgetUid, scope_path: &HeapLiveIdPath) {
+        let mut handled = true;
+        
         match ke.key_code {
             KeyCode::ArrowLeft => {
                 if ke.modifiers.shift && self.cursor.selection.is_none() {
@@ -319,24 +323,32 @@ impl RichTextInput {
                 self.cursor.update_selection(self.cursor.position.clone());
                 cx.redraw_all();
             }
-            _ => {}
+            _ => {
+                handled = false;
+            }
+        }
+        
+        if !handled {
+            cx.widget_action(uid, scope_path, RichTextInputAction::KeyDownUnhandled(ke.clone()));
         }
     }
     
-    fn handle_text_input(&mut self, cx: &mut Cx, input: &str) {
+    fn handle_text_input(&mut self, cx: &mut Cx, input: &str, uid: WidgetUid, scope_path: &HeapLiveIdPath) {
         self.save_undo_state();
         self.delete_selection();
         self.text.insert_str(self.cursor.position.char_index, input);
         self.cursor.position.char_index += input.len();
         self.cursor.position = self.cursor.char_index_to_position(&self.text, self.cursor.position.char_index);
         self.update_mapping();
+        cx.widget_action(uid, scope_path, RichTextInputAction::Changed(self.text.clone()));
         cx.redraw_all();
     }
     
-    fn handle_mouse_down(&mut self, cx: &mut Cx, me: &MouseDownEvent) {
+    fn handle_mouse_down(&mut self, cx: &mut Cx, me: &MouseDownEvent, uid: WidgetUid, scope_path: &HeapLiveIdPath) {
         if self.area.rect(cx).contains(me.abs) {
             self.is_focused = true;
             cx.set_key_focus(self.area);
+            cx.widget_action(uid, scope_path, RichTextInputAction::KeyFocus);
             
             let click_x = me.abs.x - self.area.rect(cx).pos.x - 10.0;
             let new_cursor_pos = self.find_cursor_position_from_x(click_x);
