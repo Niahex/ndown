@@ -20,10 +20,12 @@ live_design!{
  
 #[derive(Live, Widget)] 
 pub struct EditorArea{
-    #[deref] #[live] view: View,
-    #[live] draw_bg: DrawColor,
+    #[redraw] #[live] draw_bg: DrawColor,
     #[live] draw_text: DrawText,
     #[live] draw_cursor: DrawColor,
+    #[walk] walk: Walk,
+    #[layout] layout: Layout,
+    #[area] area: Area,
     
     #[rust] lines: Vec<String>,
     #[rust] cursor_line: usize,
@@ -40,10 +42,8 @@ impl LiveHook for EditorArea{
 
 impl Widget for EditorArea {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
-        self.view.handle_event(cx, event, scope);
-        
-        match event.hits(cx, self.view.area()) {
-            Hit::KeyDown(ke) => {
+        match event {
+            Event::KeyDown(ke) => {
                 match ke.key_code {
                     KeyCode::ReturnKey => {
                         let current = &self.lines[self.cursor_line];
@@ -52,7 +52,7 @@ impl Widget for EditorArea {
                         self.lines.insert(self.cursor_line + 1, after);
                         self.cursor_line += 1;
                         self.cursor_col = 0;
-                        self.view.redraw(cx);
+                        self.redraw(cx);
                     }
                     KeyCode::Backspace => {
                         if self.cursor_col > 0 {
@@ -64,7 +64,7 @@ impl Widget for EditorArea {
                             self.cursor_col = self.lines[self.cursor_line].len();
                             self.lines[self.cursor_line].push_str(&line);
                         }
-                        self.view.redraw(cx);
+                        self.redraw(cx);
                     }
                     KeyCode::ArrowLeft => {
                         if self.cursor_col > 0 {
@@ -73,7 +73,7 @@ impl Widget for EditorArea {
                             self.cursor_line -= 1;
                             self.cursor_col = self.lines[self.cursor_line].len();
                         }
-                        self.view.redraw(cx);
+                        self.redraw(cx);
                     }
                     KeyCode::ArrowRight => {
                         if self.cursor_col < self.lines[self.cursor_line].len() {
@@ -82,59 +82,67 @@ impl Widget for EditorArea {
                             self.cursor_line += 1;
                             self.cursor_col = 0;
                         }
-                        self.view.redraw(cx);
+                        self.redraw(cx);
                     }
                     KeyCode::ArrowUp => {
                         if self.cursor_line > 0 {
                             self.cursor_line -= 1;
                             self.cursor_col = self.cursor_col.min(self.lines[self.cursor_line].len());
                         }
-                        self.view.redraw(cx);
+                        self.redraw(cx);
                     }
                     KeyCode::ArrowDown => {
                         if self.cursor_line < self.lines.len() - 1 {
                             self.cursor_line += 1;
                             self.cursor_col = self.cursor_col.min(self.lines[self.cursor_line].len());
                         }
-                        self.view.redraw(cx);
+                        self.redraw(cx);
                     }
                     _ => {}
                 }
             }
-            Hit::TextInput(te) => {
+            Event::TextInput(te) => {
                 self.lines[self.cursor_line].insert_str(self.cursor_col, &te.input);
                 self.cursor_col += te.input.len();
-                self.view.redraw(cx);
+                self.redraw(cx);
+            }
+            _ => {}
+        }
+        
+        match event.hits(cx, self.area) {
+            Hit::FingerDown(_) => {
+                cx.set_key_focus(self.area);
+                self.redraw(cx);
             }
             _ => {}
         }
     }
     
-    fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
-        self.draw_bg.begin(cx, walk, Layout::default());
+    fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
+        cx.begin_turtle(walk, self.layout);
         
-        cx.begin_turtle(walk, Layout {
-            flow: Flow::Down,
-            padding: Padding { left: 10.0, top: 10.0, right: 10.0, bottom: 10.0 },
-            ..Default::default()
-        });
+        let rect = cx.turtle().rect();
+        self.draw_bg.draw_abs(cx, rect);
         
         for (line_idx, line) in self.lines.iter().enumerate() {
-            let y_before = cx.turtle().pos().y;
-            self.draw_text.draw_walk(cx, Walk::default(), Align::default(), line);
+            let y_pos = cx.turtle().pos().y;
+            let x_pos = cx.turtle().pos().x;
+            
+            self.draw_text.draw_walk(cx, Walk::fit(), Align::default(), line);
             
             if line_idx == self.cursor_line {
-                let char_width = 8.0;
-                let cursor_x = 10.0 + (self.cursor_col as f64 * char_width);
+                let char_width = 9.2; // Approximate width for monospace font
+                let cursor_x = x_pos + (self.cursor_col as f64 * char_width);
                 self.draw_cursor.draw_abs(cx, Rect {
-                    pos: dvec2(cursor_x, y_before),
+                    pos: dvec2(cursor_x, y_pos),
                     size: dvec2(2.0, 16.0),
                 });
             }
+            
+            cx.turtle_new_line();
         }
         
-        cx.end_turtle();
-        self.draw_bg.end(cx);
+        cx.end_turtle_with_area(&mut self.area);
         DrawStep::done()
     }
 }
