@@ -617,6 +617,9 @@ pub struct RichTextInput {
     #[rust] composition_start: usize,
     /// IME composition tracking - byte length of current composition
     #[rust] composition_length: usize,
+    /// Key repeat timer for Backspace/Delete
+    #[rust] key_repeat_timer: Timer,
+    #[rust] key_repeat_action: Option<KeyCode>,
 }
 
  impl LiveHook for RichTextInput{
@@ -1299,6 +1302,8 @@ impl Widget for RichTextInput {
         if self.animator_handle_event(cx, event).must_redraw() {
             self.draw_bg.redraw(cx);
         }
+        
+        let uid = self.widget_uid();
 
         if self.blink_timer.is_event(event).is_some() {
             if self.animator_in_state(cx, ids!(blink.off)) {
@@ -1308,8 +1313,53 @@ impl Widget for RichTextInput {
             }
             self.blink_timer = cx.start_timeout(self.blink_speed)
         }
-
-        let uid = self.widget_uid();
+        
+        // Handle key repeat
+        if self.key_repeat_timer.is_event(event).is_some() {
+            if let Some(key_code) = self.key_repeat_action {
+                match key_code {
+                    KeyCode::Backspace if !self.is_read_only => {
+                        let mut start = self.selection.start().index;
+                        let end = self.selection.end().index;
+                        if start == end {
+                            start = prev_grapheme_boundary(&self.text, start);
+                        }
+                        self.create_or_extend_edit_group(EditKind::Backspace);
+                        self.apply_edit(
+                            cx,
+                            Edit {
+                                start,
+                                end,
+                                replace_with: String::new(),
+                            }
+                        );
+                        self.draw_bg.redraw(cx);
+                        cx.widget_action(uid, &scope.path, RichTextInputAction::Changed(self.text.clone()));
+                    }
+                    KeyCode::Delete if !self.is_read_only => {
+                        let start = self.selection.start().index;
+                        let mut end = self.selection.end().index;
+                        if start == end {
+                            end = next_grapheme_boundary(&self.text, end);
+                        }
+                        self.create_or_extend_edit_group(EditKind::Delete);
+                        self.apply_edit(
+                            cx,
+                            Edit {
+                                start,
+                                end,
+                                replace_with: String::new(),
+                            }
+                        );
+                        self.draw_bg.redraw(cx);
+                        cx.widget_action(uid, &scope.path, RichTextInputAction::Changed(self.text.clone()));
+                    }
+                    _ => {}
+                }
+                // Continue repeating faster
+                self.key_repeat_timer = cx.start_timeout(0.05);
+            }
+        }
 
         // Self-detect focus loss from taps outside our area
         if cx.has_key_focus(self.draw_bg.area()) {
@@ -1640,6 +1690,16 @@ impl Widget for RichTextInput {
                 );
                 self.draw_bg.redraw(cx);
                 cx.widget_action(uid, &scope.path, RichTextInputAction::Changed(self.text.clone()));
+                
+                // Start key repeat
+                self.key_repeat_action = Some(KeyCode::Backspace);
+                self.key_repeat_timer = cx.start_timeout(0.4); // Initial delay 400ms
+            }
+            Hit::KeyUp(KeyEvent {
+                key_code: KeyCode::Backspace,
+                ..
+            }) => {
+                self.key_repeat_action = None;
             }
             Hit::KeyDown(KeyEvent {
                 key_code: KeyCode::Delete,
@@ -1662,6 +1722,16 @@ impl Widget for RichTextInput {
                 );
                 self.draw_bg.redraw(cx);
                 cx.widget_action(uid, &scope.path, RichTextInputAction::Changed(self.text.clone()));
+                
+                // Start key repeat
+                self.key_repeat_action = Some(KeyCode::Delete);
+                self.key_repeat_timer = cx.start_timeout(0.4); // Initial delay 400ms
+            }
+            Hit::KeyUp(KeyEvent {
+                key_code: KeyCode::Delete,
+                ..
+            }) => {
+                self.key_repeat_action = None;
             }
             Hit::KeyDown(KeyEvent {
                 key_code: KeyCode::KeyZ,
