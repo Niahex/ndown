@@ -36,7 +36,6 @@ impl Document {
         let block = &mut self.blocks[block_idx];
         
         if block.ty == BlockType::Paragraph {
-            // Pour la conversion de type de bloc, on regarde le texte brut visible
             let text = block.full_text();
             
             if text.starts_with("# ") {
@@ -58,15 +57,11 @@ impl Document {
         None
     }
 
-    // Parser robuste basé sur une pile pour gérer les styles imbriqués
     pub fn apply_inline_formatting(&mut self, block_idx: usize) -> bool {
         if block_idx >= self.blocks.len() { return false; }
         
         let block = &mut self.blocks[block_idx];
         let text = block.to_markdown(); 
-        
-        // Debug
-        // makepad_widgets::log!("Parsing: '{}'", text);
         
         if !text.contains('*') && !text.contains('`') {
             return false;
@@ -77,7 +72,6 @@ impl Document {
         let len = chars.len();
         let mut i = 0;
         
-        // États courants
         let mut current_text = String::new();
         let mut is_bold = false;
         let mut is_italic = false;
@@ -86,7 +80,7 @@ impl Document {
         let mut changed = false;
 
         while i < len {
-            // CODE `...`
+            // CODE
             if !is_code && chars[i] == '`' {
                 let mut j = i + 1;
                 while j < len && chars[j] != '`' { j += 1; }
@@ -98,19 +92,17 @@ impl Document {
                         spans.push(s);
                         current_text.clear();
                     }
-                    
                     let content: String = chars[i+1..j].iter().collect();
                     let mut s = TextSpan::new(&content);
                     s.is_code = true;
                     spans.push(s);
-                    
                     i = j + 1;
                     changed = true;
                     continue;
                 }
             }
             
-            // BOLD **...**
+            // BOLD
             if !is_code && i + 1 < len && chars[i] == '*' && chars[i+1] == '*' {
                 if !current_text.is_empty() {
                     let mut s = TextSpan::new(&current_text);
@@ -138,11 +130,8 @@ impl Document {
                 }
             }
             
-            // ITALIC *...*
+            // ITALIC
             if !is_code && chars[i] == '*' {
-                // IMPORTANT: Vérifier que ce n'est PAS un morceau de bold (déjà checké au dessus, mais attention)
-                // Si on a `***`, le bold a déjà consommé les deux premiers. Le 3ème tombe ici.
-                
                 if !current_text.is_empty() {
                     let mut s = TextSpan::new(&current_text);
                     s.is_bold = is_bold; s.is_italic = is_italic;
@@ -155,10 +144,7 @@ impl Document {
                     let mut k = i + 1;
                     while k < len {
                         if chars[k] == '*' { 
-                            // Il faut s'assurer que ce n'est pas un bold !
-                            // Si k est le début de `**`, c'est pas bon pour italic
-                            if k + 1 < len && chars[k+1] == '*' {
-                                // C'est un bold, on continue de chercher
+                             if k + 1 < len && chars[k+1] == '*' {
                                 k += 2;
                                 continue;
                             }
@@ -190,7 +176,6 @@ impl Document {
         }
         
         if changed {
-            // makepad_widgets::log!("Changed! Spans: {:?}", spans.len());
             block.content = spans;
         }
         
@@ -203,12 +188,11 @@ impl Document {
         
         let mut current_idx = 0;
         let mut inserted = false;
-        let added_len = text.chars().count(); // Longueur en chars pour le curseur
+        let added_len = text.chars().count();
 
         for span in &mut block.content {
             let span_len = span.len();
             
-            // Si on est dans le span ou juste à la fin
             if char_idx <= current_idx + span_len {
                 let local_idx = char_idx - current_idx;
                 let byte_idx = span.text.char_indices().nth(local_idx).map(|(i,_)| i).unwrap_or(span.text.len());
@@ -219,7 +203,6 @@ impl Document {
             current_idx += span_len;
         }
         
-        // Si on n'a pas inséré (fin de ligne absolue ou bloc vide), on ajoute au dernier
         if !inserted {
             if let Some(last) = block.content.last_mut() {
                 last.text.push_str(text);
@@ -236,20 +219,30 @@ impl Document {
         let block = &mut self.blocks[block_idx];
         
         let mut current_idx = 0;
-        for (i, span) in block.content.iter_mut().enumerate() {
+        for (_i, span) in block.content.iter_mut().enumerate() {
             let span_len = span.len();
             
             if char_idx < current_idx + span_len {
                 let local_idx = char_idx - current_idx;
                 let byte_idx = span.text.char_indices().nth(local_idx).map(|(i,_)| i).unwrap();
                 span.text.remove(byte_idx);
-                
-                // Si le span devient vide, on pourrait le supprimer (sauf si c'est le seul)
-                // Mais gardons ça simple pour l'instant
                 return true;
             }
             current_idx += span_len;
         }
         false
+    }
+
+    // Wraps selection with markers (e.g. "**" or "*") and triggers format update
+    pub fn wrap_selection(&mut self, block_idx: usize, start: usize, end: usize, marker: &str) {
+        if block_idx >= self.blocks.len() { return; }
+        
+        // On insère d'abord la fin pour ne pas décaler l'index de début
+        // Note: insert_text_at gère l'insertion multi-span
+        self.insert_text_at(block_idx, end, marker);
+        self.insert_text_at(block_idx, start, marker);
+        
+        // On force le formatage immédiat
+        self.apply_inline_formatting(block_idx);
     }
 }
