@@ -21,19 +21,15 @@ live_design! {
                 
                 top_bar = <TopBar> {}
                 
-                <View> {
+                content = <View> {
                     width: Fill, height: Fill
                     flow: Right
                     
-                    left_sidebar = <FileExplorer> {
-                        visible: true
-                    }
+                    left_sidebar = <FileExplorer> {}
                     
                     editor = <EditorArea> {}
                     
-                    right_sidebar = <OutlinePanel> {
-                        visible: true
-                    }
+                    right_sidebar = <OutlinePanel> {}
                 }
             }
         }
@@ -57,15 +53,22 @@ impl LiveRegister for App {
 
 impl MatchEvent for App {
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
-        if self.ui.button(ids!(top_bar.left_toggle)).clicked(actions) {
+        // Debug: afficher toutes les actions
+        for action in actions {
+            log!("Action received: {:?}", action);
+        }
+        
+        if self.ui.button(ids!(ui.body.top_bar.left_toggle)).clicked(actions) {
+            log!("Left toggle clicked!");
             self.left_visible = !self.left_visible;
-            self.ui.view(ids!(left_sidebar)).set_visible(cx, self.left_visible);
+            self.ui.view(ids!(ui.body.content.left_sidebar)).set_visible(cx, self.left_visible);
             self.ui.redraw(cx);
         }
         
-        if self.ui.button(ids!(top_bar.right_toggle)).clicked(actions) {
+        if self.ui.button(ids!(ui.body.top_bar.right_toggle)).clicked(actions) {
+            log!("Right toggle clicked!");
             self.right_visible = !self.right_visible;
-            self.ui.view(ids!(right_sidebar)).set_visible(cx, self.right_visible);
+            self.ui.view(ids!(ui.body.content.right_sidebar)).set_visible(cx, self.right_visible);
             self.ui.redraw(cx);
         }
     }

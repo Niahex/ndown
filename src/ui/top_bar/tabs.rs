@@ -2,51 +2,55 @@ use makepad_widgets::*;
 
 live_design! {
     use link::theme::*;
-    use link::shaders::*;
     use link::widgets::*;
     
     pub TabItem = {{TabItem}} {
-        width: Fit, height: Fit
-        padding: {left: 10, right: 10, top: 5, bottom: 5}
-        spacing: 5
-        flow: Right
-        show_bg: true
-        draw_bg: { 
-            color: #4c566a
-            radius: 3.0
-        }
-        
-        <Label> {
-            text: "document.md"
-            draw_text: {
-                text_style: <THEME_FONT_REGULAR> {font_size: 12}
-                color: #eceff4
+        view: <View> {
+            width: Fit, height: Fit
+            padding: {left: 10, right: 10, top: 5, bottom: 5}
+            spacing: 5
+            flow: Right
+            show_bg: true
+            draw_bg: { 
+                color: #4c566a
             }
-        }
-        
-        close_btn = <Button> {
-            text: "×"
-            draw_text: { 
-                color: #d8dee9
-                text_style: <THEME_FONT_REGULAR> {font_size: 14}
+            
+            <Label> {
+                text: "document.md"
+                draw_text: {
+                    text_style: <THEME_FONT_REGULAR> {font_size: 12}
+                    color: #eceff4
+                }
+            }
+            
+            close_btn = <Button> {
+                text: "×"
+                draw_text: { 
+                    color: #d8dee9
+                    text_style: <THEME_FONT_REGULAR> {font_size: 14}
+                }
             }
         }
     }
     
     pub TabBar = {{TabBar}} {
-        width: Fill, height: Fit
-        flow: Right, spacing: 5
-        padding: {left: 5, right: 5}
-        
-        <TabItem> {}
-        <TabItem> {}
+        view: <View> {
+            width: Fill, height: Fit
+            flow: Right, spacing: 5
+            padding: {left: 5, right: 5}
+            
+            <TabItem> {}
+            <TabItem> {}
+        }
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Live, Widget)]
 pub struct TabItem {
-    #[deref] view: View,
+    #[deref] #[live] view: View,
 }
+
+impl LiveHook for TabItem {}
 
 impl Widget for TabItem {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
@@ -58,10 +62,12 @@ impl Widget for TabItem {
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Live, Widget)]
 pub struct TabBar {
-    #[deref] view: View,
+    #[deref] #[live] view: View,
 }
+
+impl LiveHook for TabBar {}
 
 impl Widget for TabBar {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
