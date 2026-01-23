@@ -168,9 +168,13 @@ impl Widget for EditorArea {
                 let ctrl = ke.modifiers.control || ke.modifiers.logo;
                 
                 if ctrl && ke.key_code == KeyCode::KeyS {
-                    if let Err(e) = self.document.save_to_file("story.md") {
-                        makepad_widgets::log!("Error saving document: {}", e);
-                    }
+                    let doc_snapshot = self.document.snapshot();
+                    std::thread::spawn(move || {
+                        match doc_snapshot.save_to_file("story.md") {
+                            Ok(_) => makepad_widgets::log!("Async Save: Document saved to story.md"),
+                            Err(e) => makepad_widgets::log!("Async Save Error: {}", e),
+                        }
+                    });
                     return;
                 }
                 

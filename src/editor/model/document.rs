@@ -35,6 +35,16 @@ impl Document {
         self.next_id += 1;
         id
     }
+
+    // Crée une copie "légère" du document (sans les buffers de cache) pour l'export asynchrone
+    pub fn snapshot(&self) -> Self {
+        Self {
+            blocks: self.blocks.clone(),
+            next_id: self.next_id,
+            temp_markdown_buf: String::new(), // Pas d'allocation inutile
+            temp_char_buf: Vec::new(),
+        }
+    }
     
     // Streaming Save (Memory efficient)
     pub fn save_to_file(&self, filename: &str) -> std::io::Result<()> {
