@@ -13,14 +13,6 @@ live_design!{
             visible: true
             
             <Label> {
-                text: "Outline"
-                draw_text: {
-                    text_style: <THEME_FONT_BOLD> {font_size: 16}
-                    color: #eceff4
-                }
-            }
-            
-            <Label> {
                 margin: {top: 20}
                 text: "# Heading 1\n## Heading 2\n### Heading 3"
                 draw_text: {

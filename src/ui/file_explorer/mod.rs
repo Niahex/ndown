@@ -13,14 +13,6 @@ live_design!{
             visible: true
             
             <Label> {
-                text: "File Explorer"
-                draw_text: {
-                    text_style: <THEME_FONT_BOLD> {font_size: 16}
-                    color: #eceff4
-                }
-            }
-            
-            <Label> {
                 margin: {top: 20}
                 text: "📁 Documents\n📁 Projects\n📄 README.md"
                 draw_text: {
