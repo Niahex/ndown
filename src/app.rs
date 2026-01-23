@@ -77,6 +77,10 @@ impl MatchEvent for App {
 
 impl AppMain for App {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
+        if let Event::Startup = event {
+            let editor = self.ui.view(ids!(body.content.editor));
+            cx.set_key_focus(editor.area());
+        }
         self.match_event(cx, event);
         self.ui.handle_event(cx, event, &mut Scope::empty());
     }
