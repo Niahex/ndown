@@ -53,22 +53,23 @@ impl LiveRegister for App {
 
 impl MatchEvent for App {
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
-        // Debug: afficher toutes les actions
-        for action in actions {
-            log!("Action received: {:?}", action);
-        }
-        
-        if self.ui.button(ids!(ui.body.top_bar.left_toggle)).clicked(actions) {
-            log!("Left toggle clicked!");
+        if self.ui.button(ids!(body.top_bar.left_toggle)).clicked(actions) {
             self.left_visible = !self.left_visible;
-            self.ui.view(ids!(ui.body.content.left_sidebar)).set_visible(cx, self.left_visible);
+            if self.left_visible {
+                self.ui.view(ids!(body.content.left_sidebar)).apply_over(cx, live!{width: 250});
+            } else {
+                self.ui.view(ids!(body.content.left_sidebar)).apply_over(cx, live!{width: 0});
+            }
             self.ui.redraw(cx);
         }
         
-        if self.ui.button(ids!(ui.body.top_bar.right_toggle)).clicked(actions) {
-            log!("Right toggle clicked!");
+        if self.ui.button(ids!(body.top_bar.right_toggle)).clicked(actions) {
             self.right_visible = !self.right_visible;
-            self.ui.view(ids!(ui.body.content.right_sidebar)).set_visible(cx, self.right_visible);
+            if self.right_visible {
+                self.ui.view(ids!(body.content.right_sidebar)).apply_over(cx, live!{width: 250});
+            } else {
+                self.ui.view(ids!(body.content.right_sidebar)).apply_over(cx, live!{width: 0});
+            }
             self.ui.redraw(cx);
         }
     }
