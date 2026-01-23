@@ -36,7 +36,10 @@ pub struct Block {
     pub id: u64,
     pub ty: BlockType,
     pub content: Vec<TextSpan>,
-    pub height_cache: f64,
+    
+    // Cache
+    pub height: f64, // Hauteur du bloc
+    pub is_dirty: bool, // Si true, la hauteur doit être recalculée
 }
 
 impl Block {
@@ -45,7 +48,8 @@ impl Block {
             id,
             ty,
             content: vec![TextSpan::new(text)],
-            height_cache: 0.0,
+            height: 0.0,
+            is_dirty: true, // Toujours dirty à la création
         }
     }
     
@@ -53,12 +57,10 @@ impl Block {
         self.content.iter().map(|s| s.len()).sum()
     }
     
-    // Retourne le texte pur (pour l'affichage curseur, recherche simple)
     pub fn full_text(&self) -> String {
         self.content.iter().map(|s| s.text.clone()).collect()
     }
 
-    // Reconstruit le markdown source (pour le re-parsing)
     pub fn to_markdown(&self) -> String {
         let mut md = String::new();
         for span in &self.content {
@@ -73,5 +75,10 @@ impl Block {
             if span.is_code { md.push('`'); }
         }
         md
+    }
+    
+    // Marquer comme sale (à appeler après modification)
+    pub fn mark_dirty(&mut self) {
+        self.is_dirty = true;
     }
 }

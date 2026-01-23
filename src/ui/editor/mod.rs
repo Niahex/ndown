@@ -13,7 +13,6 @@ live_design!{
         width: Fill, height: Fill
         draw_bg: { color: #2e3440 }
         
-        // Ajout des barres de défilement
         scroll_bars: <ScrollBars> {}
         
         draw_text_reg: { text_style: <THEME_FONT_REGULAR> { font_size: 10.0 }, color: #eceff4 }
@@ -41,7 +40,7 @@ live_design!{
 #[derive(Live, Widget)] 
 pub struct EditorArea{
     #[redraw] #[live] draw_bg: DrawColor,
-    #[live] scroll_bars: ScrollBars, // ScrollBars widget
+    #[live] scroll_bars: ScrollBars,
     
     #[live] draw_text_reg: DrawText,
     #[live] draw_text_bold: DrawText,
@@ -66,8 +65,11 @@ pub struct EditorArea{
     
     #[rust] blink_timer: Timer,
     #[rust] is_dragging: bool,
-    
     #[rust] deferred_finger_tap: Option<DVec2>,
+    
+    // CACHE SYSTEM
+    #[rust] block_y_offsets: Vec<f64>, // Offset Y de chaque bloc
+    #[rust] content_height: f64,
 }
 
 impl LiveHook for EditorArea{
@@ -114,6 +116,13 @@ impl EditorArea {
         while i < len && !chars[i].is_whitespace() { i += 1; }
         i
     }
+    
+    // Invalider le cache (tout ou partie)
+    // Pour l'instant, on invalide tout si la structure change (ajout/suppression bloc)
+    // Si c'est juste du contenu dans un bloc, on pourrait être plus fin.
+    fn invalidate_layout(&mut self) {
+        self.block_y_offsets.clear();
+    }
 }
 
 impl Widget for EditorArea {
@@ -128,7 +137,6 @@ impl Widget for EditorArea {
         }
         self.animator_handle_event(cx, event);
         
-        // ScrollBars event handling
         self.scroll_bars.handle_event(cx, event, scope);
 
         match event.hits(cx, self.area) {
@@ -162,7 +170,6 @@ impl Widget for EditorArea {
                 let shift = ke.modifiers.shift;
                 let ctrl = ke.modifiers.control || ke.modifiers.logo;
                 
-                // SAVE COMMAND (Ctrl + S)
                 if ctrl && ke.key_code == KeyCode::KeyS {
                     match self.document.save_to_file("story.md") {
                         Ok(_) => makepad_widgets::log!("Document saved to story.md"),
@@ -230,6 +237,7 @@ impl Widget for EditorArea {
                         self.document.blocks.insert(self.cursor_block + 1, new_block);
                         self.cursor_block += 1;
                         self.cursor_char = 0;
+                        self.invalidate_layout(); // Structure change
                     }
                     KeyCode::Delete => {
                         if ctrl {
@@ -237,12 +245,15 @@ impl Widget for EditorArea {
                              if end > self.cursor_char {
                                  let range = ((self.cursor_block, self.cursor_char), (self.cursor_block, end));
                                  self.document.delete_range(range.0, range.1);
+                                 // Pas besoin d'invalider layout global si pas de merge, mais safe
+                                 self.invalidate_layout();
                              }
                         } else if let Some((start, end)) = self.get_selection_range() {
                             let new_cursor = self.document.delete_range(start, end);
                             self.cursor_block = new_cursor.0;
                             self.cursor_char = new_cursor.1;
                             self.selection_anchor = None;
+                            self.invalidate_layout();
                         } else {
                             let block = &mut self.document.blocks[self.cursor_block];
                             if self.cursor_char < block.text_len() {
@@ -251,6 +262,7 @@ impl Widget for EditorArea {
                                 let next_idx = self.cursor_block + 1;
                                 let next_block = self.document.blocks.remove(next_idx);
                                 self.document.blocks[self.cursor_block].content.extend(next_block.content);
+                                self.invalidate_layout(); // Merge = structure change
                             }
                         }
                     }
@@ -262,6 +274,7 @@ impl Widget for EditorArea {
                                 let new_cursor = self.document.delete_range(range.0, range.1);
                                 self.cursor_block = new_cursor.0;
                                 self.cursor_char = new_cursor.1;
+                                self.invalidate_layout();
                             }
                         } else if let Some((start, end)) = self.get_selection_range() {
                             if start != end {
@@ -269,6 +282,7 @@ impl Widget for EditorArea {
                                 self.cursor_block = new_cursor.0;
                                 self.cursor_char = new_cursor.1;
                                 self.selection_anchor = None;
+                                self.invalidate_layout();
                             } else {
                                 self.selection_anchor = None; 
                                 if self.cursor_char > 0 {
@@ -283,6 +297,7 @@ impl Widget for EditorArea {
                                         if let Some(new_char_pos) = self.document.merge_block_with_prev(self.cursor_block) {
                                             self.cursor_block -= 1;
                                             self.cursor_char = new_char_pos;
+                                            self.invalidate_layout();
                                         }
                                     }
                                 } else {
@@ -306,6 +321,7 @@ impl Widget for EditorArea {
                                         if let Some(new_char_pos) = self.document.merge_block_with_prev(self.cursor_block) {
                                             self.cursor_block -= 1;
                                             self.cursor_char = new_char_pos;
+                                            self.invalidate_layout();
                                         }
                                     }
                                 } else {
@@ -327,7 +343,6 @@ impl Widget for EditorArea {
                     if let Some(((start_blk, start_char), (end_blk, end_char))) = self.get_selection_range() {
                         if start_blk == end_blk && start_blk == self.cursor_block && start_char != end_char {
                             if te.input == "*" || te.input == "`" || te.input == "_" {
-                                // WRAP
                                 self.document.wrap_selection(start_blk, start_char, end_char, &te.input);
                                 self.selection_anchor = Some((start_blk, start_char + 1));
                                 self.cursor_char = end_char + 1; 
@@ -342,6 +357,7 @@ impl Widget for EditorArea {
                                 let new_cursor = self.document.delete_range(start, end);
                                 self.cursor_block = new_cursor.0;
                                 self.cursor_char = new_cursor.1;
+                                self.invalidate_layout();
                             }
                             self.selection_anchor = None;
                         }
@@ -369,11 +385,10 @@ impl Widget for EditorArea {
     
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
         cx.begin_turtle(walk, self.layout);
-        // Begin ScrollBars
         self.scroll_bars.begin(cx, walk, self.layout);
         
         let rect = cx.turtle().rect();
-        let scroll = cx.turtle().scroll(); // Get current scroll
+        let scroll = cx.turtle().scroll(); 
         
         let selection = self.get_selection_range();
         
@@ -390,6 +405,13 @@ impl Widget for EditorArea {
             draw_selection: &mut self.draw_selection,
         };
         
+        // --- CACHE & LAYOUT ---
+        // Si le cache est invalide ou incomplet, on le reconstruit au vol pendant le draw_document
+        // MAIS draw_document retourne (height, hit). On veut récupérer les offsets Y.
+        // Option simple : draw_document peut remplir un Vec si on lui passe.
+        
+        self.block_y_offsets.clear(); // Rebuild every frame for MVP simplicity (fast enough for <1000 blocks)
+        
         let (used_height, hit_res) = view.draw_document(
             cx, 
             &self.document, 
@@ -399,7 +421,8 @@ impl Widget for EditorArea {
             selection,
             true,
             self.deferred_finger_tap,
-            scroll // Pass scroll offset
+            scroll,
+            &mut self.block_y_offsets // Populate cache
         );
         
         if let Some(hit) = hit_res {
@@ -411,19 +434,11 @@ impl Widget for EditorArea {
             }
         }
         
-        self.scroll_bars.end(cx); // End ScrollBars
-        
-        // On doit définir la taille utilisée pour que les scrollbars sachent jusqu'où aller
-        // Attention: rect.size.x est la largeur de la vue. used_height est la hauteur du contenu.
-        // ScrollBars.end s'attend à ce que le Turtle ait une taille utilisée.
-        // Mais draw_document dessine en 'draw_abs', donc il ne bouge pas le turtle.
-        // On doit dire au turtle qu'on a utilisé de l'espace.
+        self.scroll_bars.end(cx);
         cx.turtle_mut().set_used(rect.size.x, used_height);
-        
         cx.end_turtle_with_area(&mut self.area);
         
         self.deferred_finger_tap = None;
-        
         DrawStep::done()
     }
 }

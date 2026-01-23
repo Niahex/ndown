@@ -33,8 +33,6 @@ impl Document {
         id
     }
     
-    // --- CONVERSION & DISK I/O ---
-
     pub fn to_markdown(&self) -> String {
         let mut output = String::new();
         for (i, block) in self.blocks.iter().enumerate() {
@@ -45,15 +43,10 @@ impl Document {
                 BlockType::Quote => "> ",
                 _ => "",
             };
-            
             output.push_str(prefix);
             output.push_str(&block.to_markdown());
-            
             if i < self.blocks.len() - 1 {
-                output.push('\n');
-                // Ajouter une ligne vide entre paragraphes pour le standard MD, 
-                // sauf si c'est une liste ou code (à affiner plus tard)
-                output.push('\n'); 
+                output.push('\n'); output.push('\n'); 
             }
         }
         output
@@ -66,33 +59,31 @@ impl Document {
         Ok(())
     }
 
-    // --- EXISTANT ---
-
     pub fn try_convert_block(&mut self, block_idx: usize) -> Option<usize> {
         if block_idx >= self.blocks.len() { return None; }
-        
         let block = &mut self.blocks[block_idx];
         
-        if block.ty == BlockType::Paragraph {
+        let removed = if block.ty == BlockType::Paragraph {
             let text = block.full_text();
-            
             if text.starts_with("# ") {
                 block.ty = BlockType::Heading1;
                 block.content = vec![TextSpan::new(&text[2..])];
-                return Some(2);
-            }
-            if text.starts_with("## ") {
+                Some(2)
+            } else if text.starts_with("## ") {
                 block.ty = BlockType::Heading2;
                 block.content = vec![TextSpan::new(&text[3..])];
-                return Some(3);
-            }
-            if text.starts_with("> ") {
+                Some(3)
+            } else if text.starts_with("> ") {
                 block.ty = BlockType::Quote;
                 block.content = vec![TextSpan::new(&text[2..])];
-                return Some(2);
-            }
+                Some(2)
+            } else { None }
+        } else { None };
+        
+        if removed.is_some() {
+            block.mark_dirty();
         }
-        None
+        removed
     }
 
     pub fn apply_inline_formatting(&mut self, block_idx: usize) -> bool {
@@ -114,14 +105,12 @@ impl Document {
         let mut is_bold = false;
         let mut is_italic = false;
         let mut is_code = false;
-        
         let mut changed = false;
 
         while i < len {
             if !is_code && chars[i] == '`' {
                 let mut j = i + 1;
                 while j < len && chars[j] != '`' { j += 1; }
-                
                 if j < len { 
                     if !current_text.is_empty() {
                         let mut s = TextSpan::new(&current_text);
@@ -138,7 +127,6 @@ impl Document {
                     continue;
                 }
             }
-            
             if !is_code && i + 1 < len && chars[i] == '*' && chars[i+1] == '*' {
                 if !current_text.is_empty() {
                     let mut s = TextSpan::new(&current_text);
@@ -146,7 +134,6 @@ impl Document {
                     spans.push(s);
                     current_text.clear();
                 }
-                
                 let mut has_closing = false;
                 if !is_bold {
                     let mut k = i + 2;
@@ -154,10 +141,7 @@ impl Document {
                         if chars[k] == '*' && chars[k+1] == '*' { has_closing = true; break; }
                         k += 1;
                     }
-                } else {
-                    has_closing = true; 
-                }
-
+                } else { has_closing = true; }
                 if has_closing {
                     is_bold = !is_bold;
                     i += 2;
@@ -165,7 +149,6 @@ impl Document {
                     continue;
                 }
             }
-            
             if !is_code && chars[i] == '*' {
                 if !current_text.is_empty() {
                     let mut s = TextSpan::new(&current_text);
@@ -173,25 +156,17 @@ impl Document {
                     spans.push(s);
                     current_text.clear();
                 }
-                
                 let mut has_closing = false;
                 if !is_italic {
                     let mut k = i + 1;
                     while k < len {
                         if chars[k] == '*' { 
-                             if k + 1 < len && chars[k+1] == '*' {
-                                k += 2;
-                                continue;
-                            }
-                            has_closing = true; 
-                            break; 
+                             if k + 1 < len && chars[k+1] == '*' { k += 2; continue; }
+                            has_closing = true; break; 
                         }
                         k += 1;
                     }
-                } else {
-                    has_closing = true;
-                }
-
+                } else { has_closing = true; }
                 if has_closing {
                     is_italic = !is_italic;
                     i += 1;
@@ -199,7 +174,6 @@ impl Document {
                     continue;
                 }
             }
-            
             current_text.push(chars[i]);
             i += 1;
         }
@@ -212,14 +186,15 @@ impl Document {
         
         if changed {
             block.content = spans;
+            block.mark_dirty();
         }
-        
         changed
     }
 
     pub fn insert_text_at(&mut self, block_idx: usize, char_idx: usize, text: &str) -> usize {
         if block_idx >= self.blocks.len() { return 0; }
         let block = &mut self.blocks[block_idx];
+        block.mark_dirty();
         
         let mut current_idx = 0;
         let mut inserted = false;
@@ -227,7 +202,6 @@ impl Document {
 
         for span in &mut block.content {
             let span_len = span.len();
-            
             if char_idx <= current_idx + span_len {
                 let local_idx = char_idx - current_idx;
                 let byte_idx = span.text.char_indices().nth(local_idx).map(|(i,_)| i).unwrap_or(span.text.len());
@@ -245,7 +219,6 @@ impl Document {
                 block.content.push(TextSpan::new(text));
             }
         }
-        
         added_len
     }
 
@@ -256,11 +229,11 @@ impl Document {
         let mut current_idx = 0;
         for (_i, span) in block.content.iter_mut().enumerate() {
             let span_len = span.len();
-            
             if char_idx < current_idx + span_len {
                 let local_idx = char_idx - current_idx;
                 let byte_idx = span.text.char_indices().nth(local_idx).map(|(i,_)| i).unwrap();
                 span.text.remove(byte_idx);
+                block.mark_dirty(); // Mark dirty only on success
                 return true;
             }
             current_idx += span_len;
@@ -277,13 +250,11 @@ impl Document {
 
     pub fn merge_block_with_prev(&mut self, block_idx: usize) -> Option<usize> {
         if block_idx == 0 || block_idx >= self.blocks.len() { return None; }
-        
         let block = self.blocks.remove(block_idx);
         let prev_block = &mut self.blocks[block_idx - 1];
-        
         let offset = prev_block.text_len();
         prev_block.content.extend(block.content);
-        
+        prev_block.mark_dirty();
         Some(offset)
     }
 
@@ -314,6 +285,7 @@ impl Document {
             if start_blk + 1 < self.blocks.len() {
                 let next_block = self.blocks.remove(start_blk + 1);
                 self.blocks[start_blk].content.extend(next_block.content);
+                self.blocks[start_blk].mark_dirty();
             }
             return (start_blk, start_char);
         }
