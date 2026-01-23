@@ -131,15 +131,18 @@ impl Widget for RichTextInput {
         
         match event {
             Event::KeyDown(ke) => {
+                ::log::info!("KeyDown: {:?}", ke.key_code);
                 self.handle_key_down(cx, ke, uid, &scope.path);
             }
             Event::KeyUp(_ke) => {
                 self.events.stop_key_repeat(cx);
             }
             Event::TextInput(ti) => {
+                ::log::info!("TextInput: '{}'", ti.input);
                 self.handle_text_input(cx, &ti.input, uid, &scope.path);
             }
             Event::MouseDown(me) => {
+                ::log::info!("MouseDown at: {:?}", me.abs);
                 self.handle_mouse_down(cx, me, uid, &scope.path);
             }
             Event::MouseMove(me) => {
@@ -153,6 +156,8 @@ impl Widget for RichTextInput {
     }
     
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
+        ::log::info!("RichTextInput::draw_walk - text: '{}', cursor: {}", self.text, self.cursor.position.char_index);
+        
         cx.begin_turtle(walk, self.layout);
         
         // Draw background
@@ -336,21 +341,25 @@ impl RichTextInput {
     }
     
     fn handle_text_input(&mut self, cx: &mut Cx, input: &str, uid: WidgetUid, scope_path: &HeapLiveIdPath) {
+        ::log::info!("handle_text_input: '{}', current text: '{}'", input, self.text);
         self.save_undo_state();
         self.delete_selection();
         self.text.insert_str(self.cursor.position.char_index, input);
         self.cursor.position.char_index += input.len();
         self.cursor.position = self.cursor.char_index_to_position(&self.text, self.cursor.position.char_index);
         self.update_mapping();
+        ::log::info!("After insert - text: '{}', cursor: {}", self.text, self.cursor.position.char_index);
         cx.widget_action(uid, scope_path, RichTextInputAction::Changed(self.text.clone()));
         cx.redraw_all();
     }
     
     fn handle_mouse_down(&mut self, cx: &mut Cx, me: &MouseDownEvent, uid: WidgetUid, scope_path: &HeapLiveIdPath) {
+        ::log::info!("handle_mouse_down - area contains: {}", self.area.rect(cx).contains(me.abs));
         if self.area.rect(cx).contains(me.abs) {
             self.is_focused = true;
             cx.set_key_focus(self.area);
             cx.widget_action(uid, scope_path, RichTextInputAction::KeyFocus);
+            ::log::info!("Focus set, is_focused: {}", self.is_focused);
             
             let click_x = me.abs.x - self.area.rect(cx).pos.x - 10.0;
             let new_cursor_pos = self.find_cursor_position_from_x(click_x);
@@ -501,11 +510,13 @@ impl RichTextInput {
     }
     
     fn render_rich_text(&mut self, cx: &mut Cx2d) {
+        ::log::info!("render_rich_text - segments: {}", self.text_mapping.segments.len());
         self.text_positions.clear();
         let mut current_x = 0.0;
         
         for segment in &self.text_mapping.segments {
             let visual_text = &self.text_mapping.visual_text[segment.visual_start..segment.visual_end];
+            ::log::info!("  segment: '{}', format: {:?}", visual_text, segment.format);
             
             // Store positions for visual text (for cursor positioning)
             for (i, _) in visual_text.char_indices() {
