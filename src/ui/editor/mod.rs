@@ -8,9 +8,26 @@ live_design!{
         width: Fill, height: Fill
         draw_bg: { color: #2e3440 }
         
-        draw_text: {
+        // --- STYLES DE TEXTE ---
+        draw_text_reg: {
+            text_style: <THEME_FONT_REGULAR> { font_size: 10.0 }
+            color: #eceff4
+        }
+        draw_text_bold: {
+            text_style: <THEME_FONT_BOLD> { font_size: 10.0 }
+            color: #eceff4
+        }
+        draw_text_italic: {
+            text_style: <THEME_FONT_ITALIC> { font_size: 10.0 }
+            color: #eceff4
+        }
+        draw_text_code: {
             text_style: <THEME_FONT_CODE> { font_size: 10.0 }
             color: #eceff4
+        }
+        draw_text_header: {
+            text_style: <THEME_FONT_BOLD> { font_size: 14.0 }
+            color: #88c0d0
         }
         
         draw_cursor: {
@@ -64,7 +81,14 @@ struct Token {
 #[derive(Live, Widget)] 
 pub struct EditorArea{
     #[redraw] #[live] draw_bg: DrawColor,
-    #[live] draw_text: DrawText,
+    
+    // Multiples styles de dessin
+    #[live] draw_text_reg: DrawText,
+    #[live] draw_text_bold: DrawText,
+    #[live] draw_text_italic: DrawText,
+    #[live] draw_text_code: DrawText,
+    #[live] draw_text_header: DrawText,
+    
     #[live] draw_cursor: DrawColor,
     #[live] draw_selection: DrawColor,
     
@@ -556,23 +580,42 @@ impl Widget for EditorArea {
         for (line_idx, line) in self.lines.iter().enumerate() {
             let pos = cx.turtle().pos();
             let start_x = pos.x;
-            // FIXED: Manual Y calculation to ensure consistent spacing
-            let y_pos = start_x + (line_idx as f64 * self.line_height); // Oups, c'est rect.pos.y ou pos.y initial
-            
-            // Correction Y pos: On utilise le rect.pos.y comme base absolue
             let y_pos = rect.pos.y + (line_idx as f64 * self.line_height) + self.layout.padding.top;
             
             let tokens = self.tokenize_line(line);
-            let mut current_x = start_x + self.layout.padding.left; // Apply padding left
+            let mut current_x = start_x + self.layout.padding.left;
             
             let mut char_count_so_far = 0;
             let mut cursor_x_final = current_x;
             let mut found_cursor = false;
             let mut sel_rects = Vec::new();
             
+            // Pre-calculate selection for this line to avoid self borrow issues inside loop
+            let line_selection = if let Some(((start_l, start_c), (end_l, end_c))) = self.get_selection_range() {
+                if line_idx >= start_l && line_idx <= end_l {
+                    Some((
+                        if line_idx == start_l { start_c } else { 0 },
+                        if line_idx == end_l { end_c } else { 999999 }
+                    ))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            
             for token in tokens {
-                // Inline style logic
-                self.draw_text.color = match token.kind {
+                // On choisit le champ DrawText approprié
+                let draw_text = match token.kind {
+                    TokenType::Header => &mut self.draw_text_header,
+                    TokenType::Bold => &mut self.draw_text_bold,
+                    TokenType::Italic => &mut self.draw_text_italic,
+                    TokenType::Code => &mut self.draw_text_code,
+                    _ => &mut self.draw_text_reg,
+                };
+
+                // On applique quand même les couleurs pour être sûr
+                draw_text.color = match token.kind {
                     TokenType::Header => vec4(0.53, 0.75, 0.81, 1.0),
                     TokenType::Bold => vec4(0.92, 0.79, 0.54, 1.0),
                     TokenType::Italic => vec4(0.71, 0.55, 0.67, 1.0),
@@ -582,12 +625,12 @@ impl Widget for EditorArea {
                 };
 
                 match token.kind {
-                    TokenType::Header => { self.draw_text.text_style.font_size = 14.0; },
-                    TokenType::Bold => { self.draw_text.text_style.font_size = 10.5; },
-                    _ => { self.draw_text.text_style.font_size = 10.0; }
+                    TokenType::Header => { draw_text.text_style.font_size = 14.0; },
+                    TokenType::Bold => { draw_text.text_style.font_size = 10.5; },
+                    _ => { draw_text.text_style.font_size = 10.0; }
                 }
 
-                let text_layout = self.draw_text.layout(cx, 0.0, 0.0, None, false, Align::default(), &token.text);
+                let text_layout = draw_text.layout(cx, 0.0, 0.0, None, false, Align::default(), &token.text);
                 let token_width = text_layout.size_in_lpxs.width as f64;
                 let token_len = token.text.chars().count();
                 
@@ -600,41 +643,39 @@ impl Widget for EditorArea {
                             cursor_x_final = current_x + token_width;
                         } else {
                             let sub_text: String = token.text.chars().take(local_idx).collect();
-                            let sub_layout = self.draw_text.layout(cx, 0.0, 0.0, None, false, Align::default(), &sub_text);
+                            let sub_layout = draw_text.layout(cx, 0.0, 0.0, None, false, Align::default(), &sub_text);
                             cursor_x_final = current_x + sub_layout.size_in_lpxs.width as f64;
                         }
                         found_cursor = true;
                     }
                 }
                 
-                if let Some(((start_l, _start_c), (end_l, _end_c))) = self.get_selection_range() {
-                    if line_idx >= start_l && line_idx <= end_l {
-                        let tok_start = char_count_so_far;
-                        let tok_end = char_count_so_far + token_len;
-                        let sel_start = if line_idx == start_l { self.get_selection_range().unwrap().0.1 } else { 0 };
-                        let sel_end = if line_idx == end_l { self.get_selection_range().unwrap().1.1 } else { 999999 };
-                        let intersect_start = tok_start.max(sel_start);
-                        let intersect_end = tok_end.min(sel_end);
-                        if intersect_start < intersect_end {
-                            let rel_s = intersect_start - tok_start;
-                            let rel_e = intersect_end - tok_start;
-                            let w_start = if rel_s == 0 { 0.0 } else {
-                                let s: String = token.text.chars().take(rel_s).collect();
-                                self.draw_text.layout(cx, 0.0, 0.0, None, false, Align::default(), &s).size_in_lpxs.width as f64
-                            };
-                            let w_end = if rel_e == token_len { token_width } else {
-                                let s: String = token.text.chars().take(rel_e).collect();
-                                self.draw_text.layout(cx, 0.0, 0.0, None, false, Align::default(), &s).size_in_lpxs.width as f64
-                            };
-                            sel_rects.push(Rect {
-                                pos: dvec2(current_x + w_start, y_pos),
-                                size: dvec2(w_end - w_start, self.line_height)
-                            });
-                        }
+                if let Some((sel_start, sel_end)) = line_selection {
+                    let tok_start = char_count_so_far;
+                    let tok_end = char_count_so_far + token_len;
+                    
+                    let intersect_start = tok_start.max(sel_start);
+                    let intersect_end = tok_end.min(sel_end);
+                    
+                    if intersect_start < intersect_end {
+                        let rel_s = intersect_start - tok_start;
+                        let rel_e = intersect_end - tok_start;
+                        let w_start = if rel_s == 0 { 0.0 } else {
+                            let s: String = token.text.chars().take(rel_s).collect();
+                            draw_text.layout(cx, 0.0, 0.0, None, false, Align::default(), &s).size_in_lpxs.width as f64
+                        };
+                        let w_end = if rel_e == token_len { token_width } else {
+                            let s: String = token.text.chars().take(rel_e).collect();
+                            draw_text.layout(cx, 0.0, 0.0, None, false, Align::default(), &s).size_in_lpxs.width as f64
+                        };
+                        sel_rects.push(Rect {
+                            pos: dvec2(current_x + w_start, y_pos),
+                            size: dvec2(w_end - w_start, self.line_height)
+                        });
                     }
                 }
                 
-                self.draw_text.draw_abs(cx, dvec2(current_x, y_pos), &token.text);
+                draw_text.draw_abs(cx, dvec2(current_x, y_pos), &token.text);
                 current_x += token_width;
                 char_count_so_far += token_len;
             }
@@ -643,8 +684,8 @@ impl Widget for EditorArea {
                 self.draw_selection.draw_abs(cx, r);
             }
             
-            if let Some(((start_l, _), (end_l, _))) = self.get_selection_range() {
-                 if line_idx >= start_l && line_idx < end_l {
+            if let Some((_, sel_end)) = line_selection {
+                 if sel_end == 999999 { // Magic number from above logic indicating end of line selection
                      self.draw_selection.draw_abs(cx, Rect {
                         pos: dvec2(current_x, y_pos),
                         size: dvec2(5.0, self.line_height)
@@ -662,10 +703,8 @@ impl Widget for EditorArea {
                     size: dvec2(2.0, self.line_height),
                 });
             }
-            // REMOVED cx.turtle_new_line();
         }
         
-        // IMPORTANT: Set the used area so layout/scrolling works
         let total_height = self.lines.len() as f64 * self.line_height + self.layout.padding.top + self.layout.padding.bottom;
         cx.turtle_mut().set_used(rect.size.x, total_height);
         
