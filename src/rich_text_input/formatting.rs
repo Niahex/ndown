@@ -1,4 +1,4 @@
-use crate::markdown::inline::{parse_inline_formatting, InlineFormat};
+use crate::rich_text_input::inline::{parse_inline_formatting, InlineFormat};
 
 pub struct FormattingManager;
 
@@ -37,11 +37,9 @@ impl FormattingManager {
                 let before = &text[..span.range.start];
                 let content = match format_type {
                     InlineFormat::Bold => &text[span.range.start + 2..span.range.end - 2],
-                    InlineFormat::Italic => &text[span.range.start + 1..span.range.end - 1],
-                    InlineFormat::Code => &text[span.range.start + 1..span.range.end - 1],
-                    InlineFormat::Link { ref text, .. } => text,
-                    InlineFormat::WikiLink { ref text } => text,
-                    InlineFormat::Image { ref alt, .. } => alt,
+                    InlineFormat::Italic | InlineFormat::Underline | InlineFormat::Code => {
+                        &text[span.range.start + 1..span.range.end - 1]
+                    }
                 };
                 let after = &text[span.range.end..];
                 

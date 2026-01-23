@@ -1,5 +1,5 @@
 use makepad_widgets::*;
-use crate::markdown::inline::InlineFormat;
+use crate::rich_text_input::inline::InlineFormat;
 use crate::rich_text_input::{
     cursor::CursorManager, 
     events::EventManager, 
@@ -42,24 +42,17 @@ live_design! {
             }
         }
         
+        draw_text_underline: {
+            text_style: <THEME_FONT_REGULAR> {font_size: 14}
+            fn get_color(self) -> vec4 {
+                return #ffffff;
+            }
+        }
+        
         draw_text_code: {
             text_style: <THEME_FONT_CODE> {font_size: 14}
             fn get_color(self) -> vec4 {
                 return #88c0d0;
-            }
-        }
-        
-        draw_text_link: {
-            text_style: <THEME_FONT_REGULAR> {font_size: 14}
-            fn get_color(self) -> vec4 {
-                return #5e81ac;
-            }
-        }
-        
-        draw_text_wiki: {
-            text_style: <THEME_FONT_REGULAR> {font_size: 14}
-            fn get_color(self) -> vec4 {
-                return #a3be8c;
             }
         }
         
@@ -87,9 +80,8 @@ pub struct RichTextInput {
     #[live] draw_text: DrawText,
     #[live] draw_text_bold: DrawText,
     #[live] draw_text_italic: DrawText,
+    #[live] draw_text_underline: DrawText,
     #[live] draw_text_code: DrawText,
-    #[live] draw_text_link: DrawText,
-    #[live] draw_text_wiki: DrawText,
     #[live] draw_cursor: DrawQuad,
     #[live] draw_selection: DrawQuad,
     
@@ -195,6 +187,16 @@ impl RichTextInput {
         self.text = text;
         self.update_mapping();
         self.cursor.position.char_index = self.cursor.position.char_index.min(self.text.len());
+        self.cursor.clear_selection();
+    }
+    
+    pub fn cursor_index(&self) -> usize {
+        self.cursor.position.char_index
+    }
+    
+    pub fn set_cursor_index(&mut self, index: usize) {
+        self.cursor.position.char_index = index.min(self.text.len());
+        self.cursor.position = self.cursor.char_index_to_position(&self.text, self.cursor.position.char_index);
         self.cursor.clear_selection();
     }
     
@@ -522,18 +524,11 @@ impl RichTextInput {
                 Some(InlineFormat::Italic) => {
                     self.draw_text_italic.draw_walk(cx, Walk::fit(), Align::default(), visual_text);
                 }
+                Some(InlineFormat::Underline) => {
+                    self.draw_text_underline.draw_walk(cx, Walk::fit(), Align::default(), visual_text);
+                }
                 Some(InlineFormat::Code) => {
                     self.draw_text_code.draw_walk(cx, Walk::fit(), Align::default(), visual_text);
-                }
-                Some(InlineFormat::Link { .. }) => {
-                    self.draw_text_link.draw_walk(cx, Walk::fit(), Align::default(), visual_text);
-                }
-                Some(InlineFormat::WikiLink { .. }) => {
-                    self.draw_text_wiki.draw_walk(cx, Walk::fit(), Align::default(), visual_text);
-                }
-                Some(InlineFormat::Image { .. }) => {
-                    let display = format!("[IMG: {}]", visual_text);
-                    self.draw_text_code.draw_walk(cx, Walk::fit(), Align::default(), &display);
                 }
             }
         }
@@ -629,5 +624,30 @@ impl RichTextInput {
         self.cursor.position = self.cursor.char_index_to_position(&self.text, self.cursor.position.char_index);
         self.cursor.clear_selection();
         self.update_mapping();
+    }
+}
+
+
+impl RichTextInputRef {
+    pub fn cursor_index(&self) -> usize {
+        if let Some(inner) = self.borrow() {
+            inner.cursor_index()
+        } else {
+            0
+        }
+    }
+    
+    pub fn set_cursor_index(&self, index: usize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_cursor_index(index);
+        }
+    }
+    
+    pub fn set_text_and_cursor(&self, cx: &mut Cx, text: String, cursor: usize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_text(text);
+            inner.set_cursor_index(cursor);
+        }
+        self.redraw(cx);
     }
 }

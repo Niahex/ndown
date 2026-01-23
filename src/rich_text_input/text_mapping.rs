@@ -1,4 +1,4 @@
-use crate::markdown::inline::{parse_inline_formatting, InlineFormat};
+use crate::rich_text_input::inline::{parse_inline_formatting, InlineFormat};
 
 #[derive(Clone, Debug)]
 pub struct VisualSegment {
@@ -48,18 +48,13 @@ impl TextMapping {
                     let content = &text[span.range.start + 1..span.range.end - 1];
                     (content, Some(span.format.clone()))
                 }
-                InlineFormat::Code => {
+                InlineFormat::Underline => {
                     let content = &text[span.range.start + 1..span.range.end - 1];
                     (content, Some(span.format.clone()))
                 }
-                InlineFormat::Link { text: link_text, .. } => {
-                    (link_text.as_str(), Some(span.format.clone()))
-                }
-                InlineFormat::WikiLink { text: wiki_text } => {
-                    (wiki_text.as_str(), Some(span.format.clone()))
-                }
-                InlineFormat::Image { alt, .. } => {
-                    (alt.as_str(), Some(span.format.clone()))
+                InlineFormat::Code => {
+                    let content = &text[span.range.start + 1..span.range.end - 1];
+                    (content, Some(span.format.clone()))
                 }
             };
 

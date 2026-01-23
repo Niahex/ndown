@@ -1,35 +1,45 @@
 use makepad_widgets::*;
 
 live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-    use crate::block_editor::BlockEditor;
+    import makepad_widgets::base::*;
+    import makepad_widgets::theme_desktop_dark::*;
+    import crate::rich_text_input::*;
     
     App = {{App}} {
-        ui: <Root> {
-            main_window = <Window> {
-                window: {inner_size: vec2(800, 600)}
-                show_bg: true
-                draw_bg: {
-                    fn pixel(self) -> vec4 {
-                        return #1a1a1a
+        ui: <Window> {
+            window: {inner_size: vec2(800, 600)},
+            pass: {clear_color: #2e3440},
+            
+            body = <View> {
+                width: Fill, height: Fill
+                flow: Down, spacing: 20, padding: 20
+                
+                <Label> {
+                    text: "RichTextInput Test"
+                    draw_text: {
+                        text_style: <THEME_FONT_BOLD> {font_size: 20}
+                        color: #eceff4
                     }
                 }
-                body = <View> {
-                    flow: Down
-                    padding: 20
-                    spacing: 10
-                    
-                    <Label> {
-                        draw_text: {
-                            text_style: <THEME_FONT_BOLD> {font_size: 20}
-                            color: #ffffff
-                        }
-                        text: "ndown - Markdown Editor"
+                
+                <Label> {
+                    text: "Type with markdown: **bold**, *italic*, _underline_, `code`"
+                    draw_text: {
+                        text_style: <THEME_FONT_REGULAR> {font_size: 12}
+                        color: #d8dee9
                     }
-                    
-                    block_editor = <BlockEditor> {}
+                }
+                
+                editor = <RichTextInputBase> {
+                    width: Fill, height: 200
+                }
+                
+                <Label> {
+                    text: "Shortcuts: Ctrl+B (bold), Ctrl+I (italic)"
+                    draw_text: {
+                        text_style: <THEME_FONT_REGULAR> {font_size: 12}
+                        color: #d8dee9
+                    }
                 }
             }
         }
@@ -46,17 +56,12 @@ pub struct App {
 impl LiveRegister for App {
     fn live_register(cx: &mut Cx) {
         makepad_widgets::live_design(cx);
-        crate::block_editor::live_design(cx);
+        crate::rich_text_input::live_design(cx);
     }
 }
 
 impl MatchEvent for App {
-    fn handle_startup(&mut self, _cx: &mut Cx) {
-        ::log::info!("App started");
-    }
-    
-    fn handle_actions(&mut self, _cx: &mut Cx, _actions: &Actions) {
-    }
+    fn handle_actions(&mut self, _cx: &mut Cx, _actions: &Actions) {}
 }
 
 impl AppMain for App {
