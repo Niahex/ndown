@@ -6,6 +6,7 @@ pub mod app;
 
 pub fn live_design(cx: &mut Cx) {
     makepad_widgets::live_design(cx);
+    makepad_code_editor::live_design(cx);
     ui::editor::live_design(cx);
     ui::file_explorer::live_design(cx);
     ui::outline_panel::live_design(cx);

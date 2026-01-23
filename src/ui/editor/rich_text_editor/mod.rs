@@ -1,25 +1,24 @@
 use makepad_widgets::*;
 
-live_design!{
+live_design! {
+    use link::shaders::*;
     use link::theme::*;
     use link::widgets::*;
-    
-    pub EditorArea = {{EditorArea}}{
+
+    pub RichTextEditor = {{RichTextEditor}} {
         width: Fill, height: Fill
-        show_bg: true
-        draw_bg: { color: #2e3440 }
+        draw_bg: { color: (THEME_COLOR_BG_CONTAINER) }
         draw_text: {
             text_style: <THEME_FONT_CODE> {}
-            color: #eceff4
         }
         draw_cursor: {
             color: (THEME_COLOR_U_1)
         }
     }
 }
- 
-#[derive(Live, Widget)] 
-pub struct EditorArea{
+
+#[derive(Live, Widget)]
+pub struct RichTextEditor {
     #[deref] #[live] view: View,
     #[live] draw_bg: DrawColor,
     #[live] draw_text: DrawText,
@@ -30,15 +29,15 @@ pub struct EditorArea{
     #[rust] cursor_col: usize,
 }
 
-impl LiveHook for EditorArea{
+impl LiveHook for RichTextEditor {
     fn after_new_from_doc(&mut self, _cx: &mut Cx) {
-        self.lines = vec!["# Hello Markdown".to_string(), String::new(), "Type here...".to_string()];
+        self.lines = vec![String::new()];
         self.cursor_line = 0;
         self.cursor_col = 0;
     }
 }
 
-impl Widget for EditorArea {
+impl Widget for RichTextEditor {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
         self.view.handle_event(cx, event, scope);
         
@@ -109,32 +108,53 @@ impl Widget for EditorArea {
             _ => {}
         }
     }
-    
+
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
         self.draw_bg.begin(cx, walk, Layout::default());
         
-        cx.begin_turtle(walk, Layout {
-            flow: Flow::Down,
-            padding: Padding { left: 10.0, top: 10.0, right: 10.0, bottom: 10.0 },
-            ..Default::default()
-        });
+        let mut y = 10.0;
+        let x = 10.0;
         
         for (line_idx, line) in self.lines.iter().enumerate() {
-            let y_before = cx.turtle().pos().y;
             self.draw_text.draw_walk(cx, Walk::default(), Align::default(), line);
             
             if line_idx == self.cursor_line {
-                let char_width = 8.0;
-                let cursor_x = 10.0 + (self.cursor_col as f64 * char_width);
+                let cursor_x = x + (self.cursor_col as f64 * 8.0);
                 self.draw_cursor.draw_abs(cx, Rect {
-                    pos: dvec2(cursor_x, y_before),
+                    pos: dvec2(cursor_x, y),
                     size: dvec2(2.0, 16.0),
                 });
             }
+            
+            y += 20.0;
         }
         
-        cx.end_turtle();
         self.draw_bg.end(cx);
         DrawStep::done()
+    }
+}
+
+#[derive(Clone, Debug, DefaultNone)]
+pub enum RichTextEditorAction {
+    None,
+    Change,
+}
+
+impl RichTextEditorRef {
+    pub fn set_text(&self, text: &str) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.lines = text.lines().map(|s| s.to_string()).collect();
+            if inner.lines.is_empty() {
+                inner.lines.push(String::new());
+            }
+        }
+    }
+    
+    pub fn get_text(&self) -> String {
+        if let Some(inner) = self.borrow() {
+            inner.lines.join("\n")
+        } else {
+            String::new()
+        }
     }
 }

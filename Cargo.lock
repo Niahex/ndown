@@ -432,6 +432,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "makepad-code-editor"
+version = "1.0.0"
+source = "git+https://github.com/makepad/makepad?rev=774a07c#774a07ce44a5c2acd0b7c22d0fe7d895fc1bc0a1"
+dependencies = [
+ "makepad-widgets",
+]
+
+[[package]]
 name = "makepad-derive-live"
 version = "1.0.0"
 source = "git+https://github.com/makepad/makepad?rev=774a07c#774a07ce44a5c2acd0b7c22d0fe7d895fc1bc0a1"
@@ -838,6 +846,7 @@ dependencies = [
  "chrono",
  "env_logger",
  "log",
+ "makepad-code-editor",
  "makepad-widgets",
  "unicode-segmentation",
 ]
