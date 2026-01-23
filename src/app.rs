@@ -4,6 +4,7 @@ live_design! {
     use link::theme::*;
     use link::shaders::*;
     use link::widgets::*;
+    use crate::rich_text_input::*;
     
     App = {{App}} {
         ui: <Window> {
@@ -15,7 +16,7 @@ live_design! {
                 flow: Down, spacing: 20, padding: 20
                 
                 <Label> {
-                    text: "RichTextInput Test"
+                    text: "RichTextInput Test - Minimal"
                     draw_text: {
                         text_style: <THEME_FONT_BOLD> {font_size: 20}
                         color: #eceff4
@@ -23,23 +24,15 @@ live_design! {
                 }
                 
                 <Label> {
-                    text: "Type with markdown: **bold**, *italic*, _underline_, `code`"
+                    text: "Click and type to test"
                     draw_text: {
                         text_style: <THEME_FONT_REGULAR> {font_size: 12}
                         color: #d8dee9
                     }
                 }
                 
-                editor = <RichTextInputBase> {
+                editor = <RichTextInput> {
                     width: Fill, height: 200
-                }
-                
-                <Label> {
-                    text: "Shortcuts: Ctrl+B (bold), Ctrl+I (italic)"
-                    draw_text: {
-                        text_style: <THEME_FONT_REGULAR> {font_size: 12}
-                        color: #d8dee9
-                    }
                 }
             }
         }
