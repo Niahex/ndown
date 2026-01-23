@@ -67,9 +67,8 @@ pub struct EditorArea{
     #[rust] is_dragging: bool,
     #[rust] deferred_finger_tap: Option<DVec2>,
     
-    // CACHE SYSTEM
-    #[rust] block_y_offsets: Vec<f64>, // Offset Y de chaque bloc
-    #[rust] content_height: f64,
+    #[rust] block_y_offsets: Vec<f64>,
+    #[rust] last_rendered_width: f64, // Pour détecter le resize
 }
 
 impl LiveHook for EditorArea{
@@ -117,9 +116,6 @@ impl EditorArea {
         i
     }
     
-    // Invalider le cache (tout ou partie)
-    // Pour l'instant, on invalide tout si la structure change (ajout/suppression bloc)
-    // Si c'est juste du contenu dans un bloc, on pourrait être plus fin.
     fn invalidate_layout(&mut self) {
         self.block_y_offsets.clear();
     }
@@ -136,7 +132,6 @@ impl Widget for EditorArea {
             self.blink_timer = cx.start_timeout(0.5);
         }
         self.animator_handle_event(cx, event);
-        
         self.scroll_bars.handle_event(cx, event, scope);
 
         match event.hits(cx, self.area) {
@@ -164,7 +159,6 @@ impl Widget for EditorArea {
                 self.deferred_finger_tap = None;
                 self.redraw(cx);
             }
-            
             Hit::KeyDown(ke) => {
                 self.reset_blink(cx);
                 let shift = ke.modifiers.shift;
@@ -177,7 +171,6 @@ impl Widget for EditorArea {
                     }
                     return;
                 }
-                
                 if shift {
                     if self.selection_anchor.is_none() {
                         self.selection_anchor = Some((self.cursor_block, self.cursor_char));
@@ -190,7 +183,6 @@ impl Widget for EditorArea {
                         _ => {}
                     }
                 }
-
                 match ke.key_code {
                     KeyCode::ArrowUp => {
                         if self.cursor_block > 0 {
@@ -237,7 +229,7 @@ impl Widget for EditorArea {
                         self.document.blocks.insert(self.cursor_block + 1, new_block);
                         self.cursor_block += 1;
                         self.cursor_char = 0;
-                        self.invalidate_layout(); // Structure change
+                        self.invalidate_layout();
                     }
                     KeyCode::Delete => {
                         if ctrl {
@@ -245,7 +237,6 @@ impl Widget for EditorArea {
                              if end > self.cursor_char {
                                  let range = ((self.cursor_block, self.cursor_char), (self.cursor_block, end));
                                  self.document.delete_range(range.0, range.1);
-                                 // Pas besoin d'invalider layout global si pas de merge, mais safe
                                  self.invalidate_layout();
                              }
                         } else if let Some((start, end)) = self.get_selection_range() {
@@ -262,7 +253,7 @@ impl Widget for EditorArea {
                                 let next_idx = self.cursor_block + 1;
                                 let next_block = self.document.blocks.remove(next_idx);
                                 self.document.blocks[self.cursor_block].content.extend(next_block.content);
-                                self.invalidate_layout(); // Merge = structure change
+                                self.invalidate_layout();
                             }
                         }
                     }
@@ -361,7 +352,6 @@ impl Widget for EditorArea {
                             }
                             self.selection_anchor = None;
                         }
-                        
                         let added = self.document.insert_text_at(self.cursor_block, self.cursor_char, &te.input);
                         self.cursor_char += added;
                         
@@ -375,7 +365,6 @@ impl Widget for EditorArea {
                             }
                         }
                     }
-                    
                     self.redraw(cx);
                 }
             }
@@ -389,6 +378,12 @@ impl Widget for EditorArea {
         
         let rect = cx.turtle().rect();
         let scroll = cx.turtle().scroll(); 
+        
+        // Invalidation sur redimensionnement
+        if rect.size.x != self.last_rendered_width {
+            self.invalidate_layout();
+            self.last_rendered_width = rect.size.x;
+        }
         
         let selection = self.get_selection_range();
         
@@ -405,12 +400,16 @@ impl Widget for EditorArea {
             draw_selection: &mut self.draw_selection,
         };
         
-        // --- CACHE & LAYOUT ---
-        // Si le cache est invalide ou incomplet, on le reconstruit au vol pendant le draw_document
-        // MAIS draw_document retourne (height, hit). On veut récupérer les offsets Y.
-        // Option simple : draw_document peut remplir un Vec si on lui passe.
+        // Cache management
+        // Si le cache est invalide (vide ou taille incohérente), on doit le reconstruire
+        // MAIS view.draw_document ne reconstruit pas, elle l'utilise.
+        // Donc si le cache est invalide, il faut le vider et le remplir.
         
-        self.block_y_offsets.clear(); // Rebuild every frame for MVP simplicity (fast enough for <1000 blocks)
+        let is_cache_valid = !self.block_y_offsets.is_empty() && self.block_y_offsets.len() == self.document.blocks.len();
+        
+        if !is_cache_valid {
+            self.block_y_offsets.clear();
+        }
         
         let (used_height, hit_res) = view.draw_document(
             cx, 
@@ -422,7 +421,7 @@ impl Widget for EditorArea {
             true,
             self.deferred_finger_tap,
             scroll,
-            &mut self.block_y_offsets // Populate cache
+            &mut self.block_y_offsets
         );
         
         if let Some(hit) = hit_res {
