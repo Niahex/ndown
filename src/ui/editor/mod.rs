@@ -13,6 +13,9 @@ live_design!{
         width: Fill, height: Fill
         draw_bg: { color: #2e3440 }
         
+        // Ajout des barres de défilement
+        scroll_bars: <ScrollBars> {}
+        
         draw_text_reg: { text_style: <THEME_FONT_REGULAR> { font_size: 10.0 }, color: #eceff4 }
         draw_text_bold: { text_style: <THEME_FONT_BOLD> { font_size: 10.0 }, color: #eceff4 }
         draw_text_italic: { text_style: <THEME_FONT_ITALIC> { font_size: 10.0 }, color: #eceff4 }
@@ -38,6 +41,7 @@ live_design!{
 #[derive(Live, Widget)] 
 pub struct EditorArea{
     #[redraw] #[live] draw_bg: DrawColor,
+    #[live] scroll_bars: ScrollBars, // ScrollBars widget
     
     #[live] draw_text_reg: DrawText,
     #[live] draw_text_bold: DrawText,
@@ -113,7 +117,7 @@ impl EditorArea {
 }
 
 impl Widget for EditorArea {
-    fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
         if self.blink_timer.is_event(event).is_some() {
             if self.animator_in_state(cx, ids!(blink.off)) {
                 self.animator_play(cx, ids!(blink.on));
@@ -123,6 +127,9 @@ impl Widget for EditorArea {
             self.blink_timer = cx.start_timeout(0.5);
         }
         self.animator_handle_event(cx, event);
+        
+        // ScrollBars event handling
+        self.scroll_bars.handle_event(cx, event, scope);
 
         match event.hits(cx, self.area) {
             Hit::FingerDown(fe) => {
@@ -154,6 +161,15 @@ impl Widget for EditorArea {
                 self.reset_blink(cx);
                 let shift = ke.modifiers.shift;
                 let ctrl = ke.modifiers.control || ke.modifiers.logo;
+                
+                // SAVE COMMAND (Ctrl + S)
+                if ctrl && ke.key_code == KeyCode::KeyS {
+                    match self.document.save_to_file("story.md") {
+                        Ok(_) => makepad_widgets::log!("Document saved to story.md"),
+                        Err(e) => makepad_widgets::log!("Error saving document: {}", e),
+                    }
+                    return;
+                }
                 
                 if shift {
                     if self.selection_anchor.is_none() {
@@ -260,7 +276,6 @@ impl Widget for EditorArea {
                                         self.cursor_char -= 1;
                                     }
                                 } else if self.cursor_block > 0 {
-                                    // FUSION OU DEMOTE ?
                                     let current_type = self.document.blocks[self.cursor_block].ty.clone();
                                     if current_type != BlockType::Paragraph {
                                         self.document.blocks[self.cursor_block].ty = BlockType::Paragraph;
@@ -271,7 +286,6 @@ impl Widget for EditorArea {
                                         }
                                     }
                                 } else {
-                                     // Premier bloc du doc, si header -> paragraph
                                      let current_type = self.document.blocks[self.cursor_block].ty.clone();
                                     if current_type != BlockType::Paragraph {
                                         self.document.blocks[self.cursor_block].ty = BlockType::Paragraph;
@@ -284,7 +298,6 @@ impl Widget for EditorArea {
                                     self.cursor_char -= 1;
                                 }
                             } else {
-                                // Début de ligne
                                 if self.cursor_block > 0 {
                                     let current_type = self.document.blocks[self.cursor_block].ty.clone();
                                     if current_type != BlockType::Paragraph {
@@ -314,7 +327,7 @@ impl Widget for EditorArea {
                     if let Some(((start_blk, start_char), (end_blk, end_char))) = self.get_selection_range() {
                         if start_blk == end_blk && start_blk == self.cursor_block && start_char != end_char {
                             if te.input == "*" || te.input == "`" || te.input == "_" {
-                                // WRAP (Use end_char correctly)
+                                // WRAP
                                 self.document.wrap_selection(start_blk, start_char, end_char, &te.input);
                                 self.selection_anchor = Some((start_blk, start_char + 1));
                                 self.cursor_char = end_char + 1; 
@@ -324,14 +337,12 @@ impl Widget for EditorArea {
                     }
 
                     if !wrapped {
-                        // Si sélection active, on la traite
                         if let Some((start, end)) = self.get_selection_range() {
                             if start != end {
                                 let new_cursor = self.document.delete_range(start, end);
                                 self.cursor_block = new_cursor.0;
                                 self.cursor_char = new_cursor.1;
                             }
-                            // IMPORTANT : Toujours nettoyer l'ancre, même si start == end
                             self.selection_anchor = None;
                         }
                         
@@ -358,7 +369,11 @@ impl Widget for EditorArea {
     
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
         cx.begin_turtle(walk, self.layout);
+        // Begin ScrollBars
+        self.scroll_bars.begin(cx, walk, self.layout);
+        
         let rect = cx.turtle().rect();
+        let scroll = cx.turtle().scroll(); // Get current scroll
         
         let selection = self.get_selection_range();
         
@@ -383,7 +398,8 @@ impl Widget for EditorArea {
             (self.cursor_block, self.cursor_char),
             selection,
             true,
-            self.deferred_finger_tap 
+            self.deferred_finger_tap,
+            scroll // Pass scroll offset
         );
         
         if let Some(hit) = hit_res {
@@ -395,7 +411,15 @@ impl Widget for EditorArea {
             }
         }
         
+        self.scroll_bars.end(cx); // End ScrollBars
+        
+        // On doit définir la taille utilisée pour que les scrollbars sachent jusqu'où aller
+        // Attention: rect.size.x est la largeur de la vue. used_height est la hauteur du contenu.
+        // ScrollBars.end s'attend à ce que le Turtle ait une taille utilisée.
+        // Mais draw_document dessine en 'draw_abs', donc il ne bouge pas le turtle.
+        // On doit dire au turtle qu'on a utilisé de l'espace.
         cx.turtle_mut().set_used(rect.size.x, used_height);
+        
         cx.end_turtle_with_area(&mut self.area);
         
         self.deferred_finger_tap = None;

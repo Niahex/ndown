@@ -31,34 +31,52 @@ impl<'a> EditorView<'a> {
         cursor: (usize, usize), 
         selection: Option<((usize, usize), (usize, usize))>,
         _blink_visible: bool,
-        finger_hit: Option<DVec2> // Position absolue de la souris pour hit-test
-    ) -> (f64, Option<HitResult>) { // Retourne (hauteur totale, résultat du hit)
+        finger_hit: Option<DVec2>,
+        scroll: DVec2 // Ajout du paramètre scroll
+    ) -> (f64, Option<HitResult>) { 
         
         self.draw_bg.draw_abs(cx, rect);
         
-        let start_y = rect.pos.y + layout.padding.top;
-        let start_x = rect.pos.x + layout.padding.left;
+        // Appliquer le décalage de scroll à l'origine
+        let start_y = rect.pos.y + layout.padding.top - scroll.y;
+        let start_x = rect.pos.x + layout.padding.left - scroll.x;
         let mut current_y = start_y;
         
         let mut hit_result = None;
         
         for (block_idx, block) in doc.blocks.iter().enumerate() {
-            let mut current_x = start_x;
-            let mut max_height = 0.0;
-            let mut char_count_so_far = 0;
-            let mut found_cursor = false;
-            let mut cursor_x_final = start_x;
-            
-            // Layout global pour hit-test approximatif si on clique dans le vide à droite
-            let mut block_rect = Rect { pos: dvec2(start_x, current_y), size: dvec2(0.0, 0.0) };
-            
-            // Calculer la hauteur de ligne estimée avant la boucle (pour hit test vertical)
+            // Culling simple : si le bloc est au-dessus ou trop en-dessous de l'écran, on le skippe
+            // On a besoin d'estimer sa taille.
             let base_height = match block.ty {
                 BlockType::Heading1 => 28.0,
                 BlockType::Heading2 => 22.0,
                 BlockType::Quote => 20.0,
                 _ => 18.0
             };
+            
+            // Si le bloc est complètement au-dessus de la vue visible
+            if current_y + base_height < rect.pos.y {
+                current_y += base_height + 5.0;
+                continue;
+            }
+            
+            // Si on a dépassé le bas de l'écran (avec marge)
+            if current_y > rect.pos.y + rect.size.y {
+                // On peut s'arrêter de dessiner, mais il faut continuer de calculer la hauteur totale
+                // Pour faire simple dans ce MVP, on continue la boucle sans dessiner (draw_abs est cheap si hors écran ?)
+                // Non, draw_abs ajoute des vertices. Il faut skipper.
+                // Mais pour la hauteur totale, on doit tout parcourir...
+                // Ou alors on stocke la hauteur totale quelque part.
+                // Pour l'instant, on ne break pas pour avoir la hauteur correcte pour la scrollbar.
+            }
+
+            let mut current_x = start_x;
+            let mut max_height = 0.0;
+            let mut char_count_so_far = 0;
+            let mut found_cursor = false;
+            let mut cursor_x_final = current_x;
+            
+            let mut block_rect = Rect { pos: dvec2(start_x, current_y), size: dvec2(0.0, 0.0) };
             
             // --- DRAW SPANS ---
             for span in &block.content {
@@ -92,7 +110,6 @@ impl<'a> EditorView<'a> {
                 
                 // SELECTION RENDERING
                 if let Some(((sel_start_blk, sel_start_char), (sel_end_blk, sel_end_char))) = selection {
-                    // Check intersection
                     if block_idx >= sel_start_blk && block_idx <= sel_end_blk {
                         let blk_start = if block_idx == sel_start_blk { sel_start_char } else { 0 };
                         let blk_end = if block_idx == sel_end_blk { sel_end_char } else { usize::MAX };
@@ -104,7 +121,6 @@ impl<'a> EditorView<'a> {
                         let intersect_end = span_end.min(blk_end);
                         
                         if intersect_start < intersect_end {
-                            // Calculate sub-layout for precise rect
                             let rel_start = intersect_start - span_start;
                             let rel_end = intersect_end - span_start;
                             
@@ -125,13 +141,12 @@ impl<'a> EditorView<'a> {
                 }
                 
                 // HIT TESTING (Per Span for precision)
+                // Le hit test doit prendre en compte que finger_hit est absolu, mais current_x/y sont déjà scrollés.
+                // Donc ça marche !
                 if let Some(pos) = finger_hit {
                     let rect = Rect { pos: dvec2(current_x, current_y), size: dvec2(width, height) };
                     if rect.contains(pos) {
-                        // Find precise char
                         let rel_x = pos.x - current_x;
-                        // Approximate char index based on avg width (simpler than iterating layouts)
-                        // TODO: Use binary search on layouts for perfect precision
                         let avg_char_w = width / span.len() as f64;
                         let local_char = (rel_x / avg_char_w).round() as usize;
                         let local_char = local_char.min(span.len());
@@ -166,11 +181,9 @@ impl<'a> EditorView<'a> {
                 char_count_so_far += span_len;
             }
             
-            // BLOCK RECT FINALIZATION (for row hit test fallback)
             let line_height = if max_height > 1.0 { max_height } else { base_height };
             block_rect.size = dvec2(current_x - start_x, line_height);
             
-            // Draw cursor
             if block_idx == cursor.0 {
                 if !found_cursor && cursor.1 == char_count_so_far {
                     cursor_x_final = current_x;
@@ -181,30 +194,27 @@ impl<'a> EditorView<'a> {
                 });
             }
             
-            // Fallback Hit Test (Click on the right of the line)
             if hit_result.is_none() {
                 if let Some(pos) = finger_hit {
-                    // Check Y band
                     if pos.y >= current_y && pos.y < current_y + line_height + 5.0 {
-                        // If X is beyond text, clamp to end
                         if pos.x >= current_x {
-                            hit_result = Some(HitResult {
-                                block_idx,
-                                char_idx: char_count_so_far
-                            });
+                            hit_result = Some(HitResult { block_idx, char_idx: char_count_so_far });
                         } else if pos.x < start_x {
-                             hit_result = Some(HitResult {
-                                block_idx,
-                                char_idx: 0
-                            });
+                             hit_result = Some(HitResult { block_idx, char_idx: 0 });
                         }
                     }
                 }
             }
 
-            current_y += line_height + 5.0; // Padding
+            current_y += line_height + 5.0; 
         }
         
-        (current_y - rect.pos.y, hit_result)
+        // La hauteur utilisée est la différence entre le Y final et le Y de départ (sans scroll)
+        // start_y inclut -scroll.y.
+        // On veut la hauteur totale du contenu, donc current_y + scroll.y - (rect.pos.y + padding)
+        
+        let total_content_height = current_y + scroll.y - rect.pos.y - layout.padding.top;
+        
+        (total_content_height, hit_result)
     }
 }

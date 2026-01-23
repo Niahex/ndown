@@ -1,4 +1,6 @@
 use crate::model::block::{Block, BlockType, TextSpan};
+use std::fs::File;
+use std::io::Write;
 
 #[derive(Clone, Debug)]
 pub struct Document {
@@ -13,8 +15,9 @@ impl Default for Document {
                 Block::new(1, BlockType::Heading1, "Bienvenue dans Ndown"),
                 Block::new(2, BlockType::Paragraph, "Ceci est un éditeur basé sur des blocs."),
                 Block::new(3, BlockType::Quote, "Essayez de taper # titre ou **gras**."),
+                Block::new(4, BlockType::Paragraph, "Faites Ctrl+S pour sauvegarder dans story.md"),
             ],
-            next_id: 4,
+            next_id: 5,
         }
     }
 }
@@ -30,6 +33,41 @@ impl Document {
         id
     }
     
+    // --- CONVERSION & DISK I/O ---
+
+    pub fn to_markdown(&self) -> String {
+        let mut output = String::new();
+        for (i, block) in self.blocks.iter().enumerate() {
+            let prefix = match block.ty {
+                BlockType::Heading1 => "# ",
+                BlockType::Heading2 => "## ",
+                BlockType::Heading3 => "### ",
+                BlockType::Quote => "> ",
+                _ => "",
+            };
+            
+            output.push_str(prefix);
+            output.push_str(&block.to_markdown());
+            
+            if i < self.blocks.len() - 1 {
+                output.push('\n');
+                // Ajouter une ligne vide entre paragraphes pour le standard MD, 
+                // sauf si c'est une liste ou code (à affiner plus tard)
+                output.push('\n'); 
+            }
+        }
+        output
+    }
+
+    pub fn save_to_file(&self, filename: &str) -> std::io::Result<()> {
+        let content = self.to_markdown();
+        let mut file = File::create(filename)?;
+        file.write_all(content.as_bytes())?;
+        Ok(())
+    }
+
+    // --- EXISTANT ---
+
     pub fn try_convert_block(&mut self, block_idx: usize) -> Option<usize> {
         if block_idx >= self.blocks.len() { return None; }
         
@@ -249,53 +287,34 @@ impl Document {
         Some(offset)
     }
 
-    // Supprime une plage de texte, potentiellement sur plusieurs blocs.
-    // Retourne la nouvelle position du curseur (bloc, char).
     pub fn delete_range(&mut self, start: (usize, usize), end: (usize, usize)) -> (usize, usize) {
         let (start_blk, start_char) = start;
         let (end_blk, end_char) = end;
 
         if start_blk == end_blk {
-            let block = &mut self.blocks[start_blk];
-            // Suppression naive: on reconstruit le texte sans la partie supprimée et on reparse
-            // C'est plus simple que de manipuler les spans manuellement pour un MVP
-            let full_text = block.full_text(); // TODO: utiliser to_markdown pour préserver styles ?
-            // Attention: full_text perd les styles. Pour bien faire il faudrait couper dans les spans.
-            // Pour l'instant on fait delete char par char, c'est lent mais sûr pour les spans.
-            
             let count = end_char - start_char;
             for _ in 0..count {
                 self.remove_char_at(start_blk, start_char);
             }
             return (start_blk, start_char);
         } else {
-            // Multiline delete
-            // 1. Delete end of first block
             let first_len = self.blocks[start_blk].text_len();
             for _ in start_char..first_len {
                 self.remove_char_at(start_blk, start_char);
             }
-            
-            // 2. Delete start of last block
             for _ in 0..end_char {
                  self.remove_char_at(end_blk, 0);
             }
-            
-            // 3. Remove intermediate blocks
             if end_blk > start_blk + 1 {
                 let to_remove = end_blk - start_blk - 1;
                 for _ in 0..to_remove {
                     self.blocks.remove(start_blk + 1);
                 }
             }
-            
-            // 4. Merge last block into first
-            // Après l'étape 3, le 'last block' est devenu start_blk + 1
             if start_blk + 1 < self.blocks.len() {
                 let next_block = self.blocks.remove(start_blk + 1);
                 self.blocks[start_blk].content.extend(next_block.content);
             }
-            
             return (start_blk, start_char);
         }
     }
