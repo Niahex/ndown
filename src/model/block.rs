@@ -38,8 +38,8 @@ pub struct Block {
     pub content: Vec<TextSpan>,
     
     // Cache
-    pub height: f64, // Hauteur du bloc
-    pub is_dirty: bool, // Si true, la hauteur doit être recalculée
+    pub height: f64,
+    pub is_dirty: bool,
 }
 
 impl Block {
@@ -49,7 +49,7 @@ impl Block {
             ty,
             content: vec![TextSpan::new(text)],
             height: 0.0,
-            is_dirty: true, // Toujours dirty à la création
+            is_dirty: true,
         }
     }
     
@@ -61,23 +61,28 @@ impl Block {
         self.content.iter().map(|s| s.text.clone()).collect()
     }
 
-    pub fn to_markdown(&self) -> String {
-        let mut md = String::new();
+    // Version optimisée qui écrit dans un buffer existant
+    pub fn write_markdown_to(&self, buf: &mut String) {
         for span in &self.content {
-            if span.is_code { md.push('`'); }
-            if span.is_bold { md.push_str("**"); }
-            if span.is_italic { md.push('*'); }
+            if span.is_code { buf.push('`'); }
+            if span.is_bold { buf.push_str("**"); }
+            if span.is_italic { buf.push('*'); }
             
-            md.push_str(&span.text);
+            buf.push_str(&span.text);
             
-            if span.is_italic { md.push('*'); }
-            if span.is_bold { md.push_str("**"); }
-            if span.is_code { md.push('`'); }
+            if span.is_italic { buf.push('*'); }
+            if span.is_bold { buf.push_str("**"); }
+            if span.is_code { buf.push('`'); }
         }
-        md
+    }
+
+    // Wrapper de compatibilité (mais qui alloue)
+    pub fn to_markdown(&self) -> String {
+        let mut s = String::with_capacity(self.text_len() + 10);
+        self.write_markdown_to(&mut s);
+        s
     }
     
-    // Marquer comme sale (à appeler après modification)
     pub fn mark_dirty(&mut self) {
         self.is_dirty = true;
     }

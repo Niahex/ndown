@@ -6,6 +6,12 @@ use std::io::Write;
 pub struct Document {
     pub blocks: Vec<Block>,
     next_id: u64,
+    
+    // Buffers de travail réutilisables (Optimisation Zero-Copy)
+    // Note: On ne les sérialise pas si on devait sérialiser Document, ce sont des caches.
+    // En Rust, Clone clonera les buffers vides ou pleins, c'est acceptable.
+    temp_markdown_buf: String,
+    temp_char_buf: Vec<char>,
 }
 
 impl Default for Document {
@@ -18,6 +24,8 @@ impl Default for Document {
                 Block::new(4, BlockType::Paragraph, "Faites Ctrl+S pour sauvegarder dans story.md"),
             ],
             next_id: 5,
+            temp_markdown_buf: String::with_capacity(1024),
+            temp_char_buf: Vec::with_capacity(1024),
         }
     }
 }
@@ -80,28 +88,32 @@ impl Document {
             } else { None }
         } else { None };
         
-        if removed.is_some() {
-            block.mark_dirty();
-        }
+        if removed.is_some() { block.mark_dirty(); }
         removed
     }
 
     pub fn apply_inline_formatting(&mut self, block_idx: usize) -> bool {
         if block_idx >= self.blocks.len() { return false; }
         
-        let block = &mut self.blocks[block_idx];
-        let text = block.to_markdown(); 
+        // 1. Récupération du Markdown dans le buffer réutilisable
+        self.temp_markdown_buf.clear();
+        self.blocks[block_idx].write_markdown_to(&mut self.temp_markdown_buf);
+        let text = &self.temp_markdown_buf; // Slice immutable
         
         if !text.contains('*') && !text.contains('`') {
             return false;
         }
 
-        let mut spans = Vec::new();
-        let chars: Vec<char> = text.chars().collect();
+        // 2. Conversion en Vec<char> dans le buffer réutilisable
+        self.temp_char_buf.clear();
+        self.temp_char_buf.extend(text.chars());
+        let chars = &self.temp_char_buf; // Slice immutable
         let len = chars.len();
+        
+        let mut spans = Vec::new();
         let mut i = 0;
         
-        let mut current_text = String::new();
+        let mut current_text = String::new(); // TODO: Optimiser ça aussi avec un buffer local ou Cow ?
         let mut is_bold = false;
         let mut is_italic = false;
         let mut is_code = false;
@@ -127,6 +139,7 @@ impl Document {
                     continue;
                 }
             }
+            
             if !is_code && i + 1 < len && chars[i] == '*' && chars[i+1] == '*' {
                 if !current_text.is_empty() {
                     let mut s = TextSpan::new(&current_text);
@@ -149,6 +162,7 @@ impl Document {
                     continue;
                 }
             }
+            
             if !is_code && chars[i] == '*' {
                 if !current_text.is_empty() {
                     let mut s = TextSpan::new(&current_text);
@@ -174,6 +188,7 @@ impl Document {
                     continue;
                 }
             }
+            
             current_text.push(chars[i]);
             i += 1;
         }
@@ -185,9 +200,13 @@ impl Document {
         }
         
         if changed {
-            block.content = spans;
-            block.mark_dirty();
+            self.blocks[block_idx].content = spans;
+            self.blocks[block_idx].mark_dirty();
         }
+        
+        // Note: temp_markdown_buf et temp_char_buf sont implicitement libérés pour réutilisation au prochain appel
+        // car ils font partie de self.
+        
         changed
     }
 
@@ -233,7 +252,7 @@ impl Document {
                 let local_idx = char_idx - current_idx;
                 let byte_idx = span.text.char_indices().nth(local_idx).map(|(i,_)| i).unwrap();
                 span.text.remove(byte_idx);
-                block.mark_dirty(); // Mark dirty only on success
+                block.mark_dirty();
                 return true;
             }
             current_idx += span_len;
