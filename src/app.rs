@@ -5,10 +5,10 @@ live_design! {
     use link::shaders::*;
     use link::widgets::*;
 
-    use crate::ui::top_bar::*;
-    use crate::ui::file_explorer::*;
-    use crate::ui::outline_panel::*;
-    use crate::ui::editor::*;
+    use crate::top_bar::*;
+    use crate::file_explorer::*;
+    use crate::outline_panel::*;
+    use crate::editor::*;
 
     App = {{App}} {
         ui: <Window> {

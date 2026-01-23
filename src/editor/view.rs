@@ -1,5 +1,5 @@
-use crate::model::block::{BlockLayoutCache, BlockType};
-use crate::model::document::Document;
+use crate::editor::model::block::{BlockLayoutCache, BlockType};
+use crate::editor::model::document::Document;
 use makepad_widgets::*;
 
 pub struct EditorView<'a> {

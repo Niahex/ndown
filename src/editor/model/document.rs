@@ -1,4 +1,4 @@
-use crate::model::block::{Block, BlockType, StyleBits, StyleSpan};
+use crate::editor::model::block::{Block, BlockType, StyleBits, StyleSpan};
 use std::fs::File;
 use std::io::Write;
 
