@@ -58,13 +58,12 @@ pub struct EditorArea{
     #[rust] document: Document,
     #[rust] cursor_block: usize,
     #[rust] cursor_char: usize,
-    #[rust] selection_anchor: Option<(usize, usize)>, // (block, char)
+    #[rust] selection_anchor: Option<(usize, usize)>,
     
     #[rust] blink_timer: Timer,
     #[rust] is_dragging: bool,
     
-    // Cache simple pour le hit testing approximatif
-    #[rust] line_heights: Vec<f64>,
+    #[rust] deferred_finger_tap: Option<DVec2>,
 }
 
 impl LiveHook for EditorArea{
@@ -80,7 +79,6 @@ impl EditorArea {
     fn get_selection_range(&self) -> Option<((usize, usize), (usize, usize))> {
         if let Some(anchor) = self.selection_anchor {
             let cursor = (self.cursor_block, self.cursor_char);
-            // Comparaison simple des tuples (block, char) fonctionne car usize impl Ord
             if anchor < cursor { Some((anchor, cursor)) } else { Some((cursor, anchor)) }
         } else { None }
     }
@@ -89,6 +87,28 @@ impl EditorArea {
          self.animator_play(cx, ids!(blink.on));
          cx.stop_timer(self.blink_timer);
          self.blink_timer = cx.start_timeout(0.5);
+    }
+
+    fn find_prev_word(&self) -> usize {
+        if self.cursor_char == 0 { return 0; }
+        let block = &self.document.blocks[self.cursor_block];
+        let text = block.full_text();
+        let chars: Vec<char> = text.chars().collect();
+        let mut i = self.cursor_char;
+        while i > 0 && chars[i-1].is_whitespace() { i -= 1; }
+        while i > 0 && !chars[i-1].is_whitespace() { i -= 1; }
+        i
+    }
+
+    fn find_next_word(&self) -> usize {
+        let block = &self.document.blocks[self.cursor_block];
+        let text = block.full_text();
+        let chars: Vec<char> = text.chars().collect();
+        let len = chars.len();
+        let mut i = self.cursor_char;
+        while i < len && chars[i].is_whitespace() { i += 1; }
+        while i < len && !chars[i].is_whitespace() { i += 1; }
+        i
     }
 }
 
@@ -109,67 +129,13 @@ impl Widget for EditorArea {
                 cx.set_key_focus(self.area);
                 self.reset_blink(cx);
                 self.is_dragging = true;
-                
-                // Hit Test Approximatif
-                let rect = self.area.rect(cx);
-                let rel = fe.abs - rect.pos - self.layout.padding.left_top();
-                
-                // Trouver le bloc (Y)
-                let mut y_acc = 0.0;
-                let mut found_block = 0;
-                for (i, h) in self.line_heights.iter().enumerate() {
-                    if rel.y < y_acc + *h {
-                        found_block = i;
-                        break;
-                    }
-                    y_acc += *h + 5.0; // + Padding
-                    found_block = i;
-                }
-                
-                // Trouver le char (X) - Approx simple
-                // Pour faire mieux, il faudrait le cache des largeurs de char
-                let avg_width = 8.0; 
-                let col = (rel.x / avg_width).round().max(0.0) as usize;
-                let len = if found_block < self.document.blocks.len() {
-                    self.document.blocks[found_block].text_len()
-                } else { 0 };
-                
-                self.cursor_block = found_block.min(self.document.blocks.len().saturating_sub(1));
-                self.cursor_char = col.min(len);
-                
-                if fe.modifiers.shift {
-                    if self.selection_anchor.is_none() {
-                        self.selection_anchor = Some((self.cursor_block, self.cursor_char));
-                    }
-                } else {
-                    self.selection_anchor = Some((self.cursor_block, self.cursor_char));
-                }
+                self.deferred_finger_tap = Some(fe.abs);
+                self.selection_anchor = None;
                 self.redraw(cx);
             }
             Hit::FingerMove(fe) => {
                 if self.is_dragging {
-                    let rect = self.area.rect(cx);
-                    let rel = fe.abs - rect.pos - self.layout.padding.left_top();
-                    
-                    let mut y_acc = 0.0;
-                    let mut found_block = 0;
-                    for (i, h) in self.line_heights.iter().enumerate() {
-                        if rel.y < y_acc + *h {
-                            found_block = i;
-                            break;
-                        }
-                        y_acc += *h + 5.0;
-                        found_block = i;
-                    }
-                     
-                    let avg_width = 8.0; 
-                    let col = (rel.x / avg_width).round().max(0.0) as usize;
-                    let len = if found_block < self.document.blocks.len() {
-                        self.document.blocks[found_block].text_len()
-                    } else { 0 };
-                    
-                    self.cursor_block = found_block.min(self.document.blocks.len().saturating_sub(1));
-                    self.cursor_char = col.min(len);
+                    self.deferred_finger_tap = Some(fe.abs);
                     self.redraw(cx);
                 }
             }
@@ -177,24 +143,23 @@ impl Widget for EditorArea {
                 self.is_dragging = false;
                 if let Some(anchor) = self.selection_anchor {
                     if anchor == (self.cursor_block, self.cursor_char) {
-                        self.selection_anchor = None; // Clic simple = pas de sélection
+                        self.selection_anchor = None;
                     }
                 }
+                self.deferred_finger_tap = None;
                 self.redraw(cx);
             }
             
             Hit::KeyDown(ke) => {
                 self.reset_blink(cx);
                 let shift = ke.modifiers.shift;
+                let ctrl = ke.modifiers.control || ke.modifiers.logo;
                 
-                // Gestion Sélection Shift
                 if shift {
                     if self.selection_anchor.is_none() {
                         self.selection_anchor = Some((self.cursor_block, self.cursor_char));
                     }
-                } else if !ke.modifiers.control && !ke.modifiers.logo { 
-                    // Si on bouge sans shift ni ctrl, on perd la sélection
-                    // Sauf si c'est une commande spéciale qui gère elle-même
+                } else if !ctrl { 
                     match ke.key_code {
                         KeyCode::ArrowUp | KeyCode::ArrowDown | KeyCode::ArrowLeft | KeyCode::ArrowRight => {
                              self.selection_anchor = None;
@@ -219,7 +184,9 @@ impl Widget for EditorArea {
                         }
                     }
                     KeyCode::ArrowLeft => {
-                        if self.cursor_char > 0 {
+                        if ctrl {
+                            self.cursor_char = self.find_prev_word();
+                        } else if self.cursor_char > 0 {
                             self.cursor_char -= 1;
                         } else if self.cursor_block > 0 {
                             self.cursor_block -= 1;
@@ -228,7 +195,9 @@ impl Widget for EditorArea {
                     }
                     KeyCode::ArrowRight => {
                         let len = self.document.blocks[self.cursor_block].text_len();
-                        if self.cursor_char < len {
+                        if ctrl {
+                            self.cursor_char = self.find_next_word();
+                        } else if self.cursor_char < len {
                             self.cursor_char += 1;
                         } else if self.cursor_block < self.document.blocks.len() - 1 {
                             self.cursor_block += 1;
@@ -236,7 +205,7 @@ impl Widget for EditorArea {
                         }
                     }
                     KeyCode::ReturnKey => {
-                        self.selection_anchor = None; // Reset sel
+                        self.selection_anchor = None;
                         let new_block = Block::new(
                             self.document.generate_id(),
                             BlockType::Paragraph,
@@ -246,20 +215,92 @@ impl Widget for EditorArea {
                         self.cursor_block += 1;
                         self.cursor_char = 0;
                     }
+                    KeyCode::Delete => {
+                        if ctrl {
+                             let end = self.find_next_word();
+                             if end > self.cursor_char {
+                                 let range = ((self.cursor_block, self.cursor_char), (self.cursor_block, end));
+                                 self.document.delete_range(range.0, range.1);
+                             }
+                        } else if let Some((start, end)) = self.get_selection_range() {
+                            let new_cursor = self.document.delete_range(start, end);
+                            self.cursor_block = new_cursor.0;
+                            self.cursor_char = new_cursor.1;
+                            self.selection_anchor = None;
+                        } else {
+                            let block = &mut self.document.blocks[self.cursor_block];
+                            if self.cursor_char < block.text_len() {
+                                self.document.remove_char_at(self.cursor_block, self.cursor_char);
+                            } else if self.cursor_block < self.document.blocks.len() - 1 {
+                                let next_idx = self.cursor_block + 1;
+                                let next_block = self.document.blocks.remove(next_idx);
+                                self.document.blocks[self.cursor_block].content.extend(next_block.content);
+                            }
+                        }
+                    }
                     KeyCode::Backspace => {
-                        // TODO: Supprimer la sélection si active
-                        if self.selection_anchor.is_some() {
-                            // Implémenter delete_selection
-                            self.selection_anchor = None; 
-                            // Pour l'instant on fait rien pour éviter le crash
+                        if ctrl {
+                            let start = self.find_prev_word();
+                            if start < self.cursor_char {
+                                let range = ((self.cursor_block, start), (self.cursor_block, self.cursor_char));
+                                let new_cursor = self.document.delete_range(range.0, range.1);
+                                self.cursor_block = new_cursor.0;
+                                self.cursor_char = new_cursor.1;
+                            }
+                        } else if let Some((start, end)) = self.get_selection_range() {
+                            if start != end {
+                                let new_cursor = self.document.delete_range(start, end);
+                                self.cursor_block = new_cursor.0;
+                                self.cursor_char = new_cursor.1;
+                                self.selection_anchor = None;
+                            } else {
+                                self.selection_anchor = None; 
+                                if self.cursor_char > 0 {
+                                    if self.document.remove_char_at(self.cursor_block, self.cursor_char - 1) {
+                                        self.cursor_char -= 1;
+                                    }
+                                } else if self.cursor_block > 0 {
+                                    // FUSION OU DEMOTE ?
+                                    let current_type = self.document.blocks[self.cursor_block].ty.clone();
+                                    if current_type != BlockType::Paragraph {
+                                        self.document.blocks[self.cursor_block].ty = BlockType::Paragraph;
+                                    } else {
+                                        if let Some(new_char_pos) = self.document.merge_block_with_prev(self.cursor_block) {
+                                            self.cursor_block -= 1;
+                                            self.cursor_char = new_char_pos;
+                                        }
+                                    }
+                                } else {
+                                     // Premier bloc du doc, si header -> paragraph
+                                     let current_type = self.document.blocks[self.cursor_block].ty.clone();
+                                    if current_type != BlockType::Paragraph {
+                                        self.document.blocks[self.cursor_block].ty = BlockType::Paragraph;
+                                    }
+                                }
+                            }
                         } else {
                             if self.cursor_char > 0 {
                                 if self.document.remove_char_at(self.cursor_block, self.cursor_char - 1) {
                                     self.cursor_char -= 1;
                                 }
-                            } else if self.cursor_block > 0 {
-                                self.cursor_block -= 1;
-                                self.cursor_char = self.document.blocks[self.cursor_block].text_len();
+                            } else {
+                                // Début de ligne
+                                if self.cursor_block > 0 {
+                                    let current_type = self.document.blocks[self.cursor_block].ty.clone();
+                                    if current_type != BlockType::Paragraph {
+                                        self.document.blocks[self.cursor_block].ty = BlockType::Paragraph;
+                                    } else {
+                                        if let Some(new_char_pos) = self.document.merge_block_with_prev(self.cursor_block) {
+                                            self.cursor_block -= 1;
+                                            self.cursor_char = new_char_pos;
+                                        }
+                                    }
+                                } else {
+                                    let current_type = self.document.blocks[self.cursor_block].ty.clone();
+                                    if current_type != BlockType::Paragraph {
+                                        self.document.blocks[self.cursor_block].ty = BlockType::Paragraph;
+                                    }
+                                }
                             }
                         }
                     }
@@ -268,32 +309,30 @@ impl Widget for EditorArea {
                 self.redraw(cx);
             }
             Hit::TextInput(te) => {
-                if !te.input.is_empty() {
-                    // GESTION WRAP SELECTION (*, **, `)
+                if !te.input.is_empty() && !te.input.chars().any(|c| c.is_control()) {
                     let mut wrapped = false;
                     if let Some(((start_blk, start_char), (end_blk, end_char))) = self.get_selection_range() {
-                        // Supporte uniquement la sélection dans un seul bloc pour l'instant
-                        if start_blk == end_blk && start_blk == self.cursor_block {
+                        if start_blk == end_blk && start_blk == self.cursor_block && start_char != end_char {
                             if te.input == "*" || te.input == "`" || te.input == "_" {
-                                // WRAP !
-                                // Si c'est "*", on regarde si on veut faire "**" (compliqué en 1 étape, simple toggle ici)
+                                // WRAP (Use end_char correctly)
                                 self.document.wrap_selection(start_blk, start_char, end_char, &te.input);
-                                
-                                // On décale la sélection pour inclure les nouveaux marqueurs ?
-                                // Ou on la reset.
-                                // Pour l'UX, souvent on garde la sélection sur le texte interne
                                 self.selection_anchor = Some((start_blk, start_char + 1));
-                                self.cursor_char = end_char + 1;
+                                self.cursor_char = end_char + 1; 
                                 wrapped = true;
                             }
                         }
                     }
 
                     if !wrapped {
-                        // Comportement standard : remplacer la sélection (TODO) ou insérer
-                        if self.selection_anchor.is_some() {
-                             // TODO: Delete selection before insert
-                             self.selection_anchor = None;
+                        // Si sélection active, on la traite
+                        if let Some((start, end)) = self.get_selection_range() {
+                            if start != end {
+                                let new_cursor = self.document.delete_range(start, end);
+                                self.cursor_block = new_cursor.0;
+                                self.cursor_char = new_cursor.1;
+                            }
+                            // IMPORTANT : Toujours nettoyer l'ancre, même si start == end
+                            self.selection_anchor = None;
                         }
                         
                         let added = self.document.insert_text_at(self.cursor_block, self.cursor_char, &te.input);
@@ -321,7 +360,6 @@ impl Widget for EditorArea {
         cx.begin_turtle(walk, self.layout);
         let rect = cx.turtle().rect();
         
-        // Pre-calculate selection to avoid borrow checker issues
         let selection = self.get_selection_range();
         
         let mut view = EditorView {
@@ -337,8 +375,7 @@ impl Widget for EditorArea {
             draw_selection: &mut self.draw_selection,
         };
         
-        // On récupère la hauteur et le hit result (même si on l'utilise pas encore ici pour le layout cache)
-        let (used_height, _) = view.draw_document(
+        let (used_height, hit_res) = view.draw_document(
             cx, 
             &self.document, 
             &self.layout, 
@@ -346,25 +383,23 @@ impl Widget for EditorArea {
             (self.cursor_block, self.cursor_char),
             selection,
             true,
-            None // Pas de hit test pendant le draw pour l'instant
+            self.deferred_finger_tap 
         );
         
-        // Mise à jour du cache de hauteur de lignes pour le hit test approximatif
-        // Pour faire simple, on recalcule ou on suppose. 
-        // Ici je reconstruis un cache naïf basé sur les types de blocs
-        self.line_heights.clear();
-        for block in &self.document.blocks {
-             let h = match block.ty {
-                BlockType::Heading1 => 28.0,
-                BlockType::Heading2 => 22.0,
-                BlockType::Quote => 20.0,
-                _ => 18.0
-            };
-            self.line_heights.push(h); // TODO: Récupérer la vraie hauteur depuis draw_document
+        if let Some(hit) = hit_res {
+            self.cursor_block = hit.block_idx;
+            self.cursor_char = hit.char_idx;
+            
+            if self.is_dragging && self.selection_anchor.is_none() {
+                 self.selection_anchor = Some((self.cursor_block, self.cursor_char));
+            }
         }
-
+        
         cx.turtle_mut().set_used(rect.size.x, used_height);
         cx.end_turtle_with_area(&mut self.area);
+        
+        self.deferred_finger_tap = None;
+        
         DrawStep::done()
     }
 }

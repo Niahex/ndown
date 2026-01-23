@@ -80,7 +80,6 @@ impl Document {
         let mut changed = false;
 
         while i < len {
-            // CODE
             if !is_code && chars[i] == '`' {
                 let mut j = i + 1;
                 while j < len && chars[j] != '`' { j += 1; }
@@ -102,7 +101,6 @@ impl Document {
                 }
             }
             
-            // BOLD
             if !is_code && i + 1 < len && chars[i] == '*' && chars[i+1] == '*' {
                 if !current_text.is_empty() {
                     let mut s = TextSpan::new(&current_text);
@@ -130,7 +128,6 @@ impl Document {
                 }
             }
             
-            // ITALIC
             if !is_code && chars[i] == '*' {
                 if !current_text.is_empty() {
                     let mut s = TextSpan::new(&current_text);
@@ -233,16 +230,73 @@ impl Document {
         false
     }
 
-    // Wraps selection with markers (e.g. "**" or "*") and triggers format update
     pub fn wrap_selection(&mut self, block_idx: usize, start: usize, end: usize, marker: &str) {
         if block_idx >= self.blocks.len() { return; }
-        
-        // On insère d'abord la fin pour ne pas décaler l'index de début
-        // Note: insert_text_at gère l'insertion multi-span
         self.insert_text_at(block_idx, end, marker);
         self.insert_text_at(block_idx, start, marker);
-        
-        // On force le formatage immédiat
         self.apply_inline_formatting(block_idx);
+    }
+
+    pub fn merge_block_with_prev(&mut self, block_idx: usize) -> Option<usize> {
+        if block_idx == 0 || block_idx >= self.blocks.len() { return None; }
+        
+        let block = self.blocks.remove(block_idx);
+        let prev_block = &mut self.blocks[block_idx - 1];
+        
+        let offset = prev_block.text_len();
+        prev_block.content.extend(block.content);
+        
+        Some(offset)
+    }
+
+    // Supprime une plage de texte, potentiellement sur plusieurs blocs.
+    // Retourne la nouvelle position du curseur (bloc, char).
+    pub fn delete_range(&mut self, start: (usize, usize), end: (usize, usize)) -> (usize, usize) {
+        let (start_blk, start_char) = start;
+        let (end_blk, end_char) = end;
+
+        if start_blk == end_blk {
+            let block = &mut self.blocks[start_blk];
+            // Suppression naive: on reconstruit le texte sans la partie supprimée et on reparse
+            // C'est plus simple que de manipuler les spans manuellement pour un MVP
+            let full_text = block.full_text(); // TODO: utiliser to_markdown pour préserver styles ?
+            // Attention: full_text perd les styles. Pour bien faire il faudrait couper dans les spans.
+            // Pour l'instant on fait delete char par char, c'est lent mais sûr pour les spans.
+            
+            let count = end_char - start_char;
+            for _ in 0..count {
+                self.remove_char_at(start_blk, start_char);
+            }
+            return (start_blk, start_char);
+        } else {
+            // Multiline delete
+            // 1. Delete end of first block
+            let first_len = self.blocks[start_blk].text_len();
+            for _ in start_char..first_len {
+                self.remove_char_at(start_blk, start_char);
+            }
+            
+            // 2. Delete start of last block
+            for _ in 0..end_char {
+                 self.remove_char_at(end_blk, 0);
+            }
+            
+            // 3. Remove intermediate blocks
+            if end_blk > start_blk + 1 {
+                let to_remove = end_blk - start_blk - 1;
+                for _ in 0..to_remove {
+                    self.blocks.remove(start_blk + 1);
+                }
+            }
+            
+            // 4. Merge last block into first
+            // Après l'étape 3, le 'last block' est devenu start_blk + 1
+            if start_blk + 1 < self.blocks.len() {
+                let next_block = self.blocks.remove(start_blk + 1);
+                self.blocks[start_blk].content.extend(next_block.content);
+            }
+            
+            return (start_blk, start_char);
+        }
     }
 }
