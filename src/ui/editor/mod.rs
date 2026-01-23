@@ -7,12 +7,12 @@ live_design!{
     pub EditorArea = {{EditorArea}}{
         width: Fill, height: Fill
         draw_bg: { color: #2e3440 }
+        
         draw_text: {
-            text_style: <THEME_FONT_CODE> {
-                font_size: 10.0
-            }
+            text_style: <THEME_FONT_CODE> { font_size: 10.0 }
             color: #eceff4
         }
+        
         draw_cursor: {
             color: #ffffff
         }
@@ -36,7 +36,7 @@ live_design!{
     }
 }
 
-// --- STRUCTURES DE DONNÉES ---
+// --- STRUCTURES ---
 
 #[derive(Clone, Debug)]
 struct EditorState {
@@ -61,8 +61,6 @@ struct Token {
     kind: TokenType,
 }
 
-// --- WIDGET ---
-
 #[derive(Live, Widget)] 
 pub struct EditorArea{
     #[redraw] #[live] draw_bg: DrawColor,
@@ -82,12 +80,13 @@ pub struct EditorArea{
     #[rust] selection_anchor: Option<(usize, usize)>,
     
     #[rust] blink_timer: Timer,
-    #[rust] cell_width: f64,
-    #[rust] cell_height: f64,
     
     #[rust] undo_stack: Vec<EditorState>,
     #[rust] redo_stack: Vec<EditorState>,
     #[rust] is_dragging: bool,
+    
+    #[rust] caret_x_geom: f64,
+    #[rust] line_height: f64,
 }
 
 impl LiveHook for EditorArea{
@@ -104,118 +103,59 @@ impl LiveHook for EditorArea{
         self.cursor_line = 6;
         self.cursor_col = 0;
         self.blink_timer = cx.start_timeout(0.5);
+        self.line_height = 18.0;
     }
 }
 
 impl EditorArea {
-    // --- PARSING MARKDOWN SIMPLE ---
-    
-    fn get_color_for_token(&self, kind: TokenType) -> Vec4 {
-        match kind {
-            TokenType::Header => vec4(0.53, 0.75, 0.81, 1.0), // #88c0d0 (Nord Blue)
-            TokenType::Bold => vec4(0.92, 0.79, 0.54, 1.0),   // #ebcb8b (Nord Yellow)
-            TokenType::Italic => vec4(0.71, 0.55, 0.67, 1.0), // #b48ead (Nord Purple)
-            TokenType::Code => vec4(0.63, 0.74, 0.54, 1.0),   // #a3be8c (Nord Green)
-            TokenType::Link => vec4(0.36, 0.54, 0.66, 1.0),   // #5e81ac (Nord Dark Blue)
-            TokenType::Normal => vec4(0.92, 0.93, 0.95, 1.0), // #eceff4 (Nord White)
-        }
-    }
-
     fn tokenize_line(&self, line: &str) -> Vec<Token> {
         let mut tokens = Vec::new();
-        
-        // 1. Check Header (Ligne entière)
-        if line.starts_with("#") {
-            tokens.push(Token {
-                text: line.to_string(),
-                kind: TokenType::Header,
-            });
+        if line.starts_with('#') {
+            tokens.push(Token { text: line.to_string(), kind: TokenType::Header });
             return tokens;
         }
-        
-        // 2. Inline Parsing (Bold, Italic, Code)
         let chars: Vec<char> = line.chars().collect();
         let len = chars.len();
         let mut i = 0;
         let mut start = 0;
-        
         while i < len {
-            // Code Block `...`
             if chars[i] == '`' {
-                // Flush text before
-                if i > start {
-                    tokens.push(Token { text: line[start..i].to_string(), kind: TokenType::Normal });
-                }
-                
+                if i > start { tokens.push(Token { text: line[start..i].to_string(), kind: TokenType::Normal }); }
                 let code_start = i;
                 i += 1;
-                while i < len && chars[i] != '`' {
-                    i += 1;
-                }
-                
-                if i < len { i += 1; } // Consume closing backtick
-                
+                while i < len && chars[i] != '`' { i += 1; }
+                if i < len { i += 1; }
                 tokens.push(Token { text: line[code_start..i].to_string(), kind: TokenType::Code });
                 start = i;
                 continue;
             }
-            
-            // Bold **...**
             if i + 1 < len && chars[i] == '*' && chars[i+1] == '*' {
-                 if i > start {
-                    tokens.push(Token { text: line[start..i].to_string(), kind: TokenType::Normal });
-                }
-                
+                 if i > start { tokens.push(Token { text: line[start..i].to_string(), kind: TokenType::Normal }); }
                 let bold_start = i;
-                i += 2; // Skip **
-                while i + 1 < len && !(chars[i] == '*' && chars[i+1] == '*') {
-                    i += 1;
-                }
-                
-                if i + 1 < len { i += 2; } // Consume closing **
-                
+                i += 2;
+                while i + 1 < len && !(chars[i] == '*' && chars[i+1] == '*') { i += 1; }
+                if i + 1 < len { i += 2; }
                 tokens.push(Token { text: line[bold_start..i].to_string(), kind: TokenType::Bold });
                 start = i;
                 continue;
             }
-            
-            // Italic *...* (Simple check, might conflict with bold if not careful, but order matters above)
-            // Note: Parser très naïf qui peut échouer sur des cas complexes
             if chars[i] == '*' {
-                 if i > start {
-                    tokens.push(Token { text: line[start..i].to_string(), kind: TokenType::Normal });
-                }
-                
+                 if i > start { tokens.push(Token { text: line[start..i].to_string(), kind: TokenType::Normal }); }
                 let italic_start = i;
                 i += 1;
-                while i < len && chars[i] != '*' {
-                    i += 1;
-                }
-                
-                if i < len { i += 1; } // Consume closing *
-                
+                while i < len && chars[i] != '*' { i += 1; }
+                if i < len { i += 1; }
                 tokens.push(Token { text: line[italic_start..i].to_string(), kind: TokenType::Italic });
                 start = i;
                 continue;
             }
-
             i += 1;
         }
-        
-        // Flush remaining text
-        if start < len {
-            tokens.push(Token { text: line[start..].to_string(), kind: TokenType::Normal });
-        }
-        
-        if tokens.is_empty() {
-             tokens.push(Token { text: String::new(), kind: TokenType::Normal });
-        }
-        
+        if start < len { tokens.push(Token { text: line[start..].to_string(), kind: TokenType::Normal }); }
+        if tokens.is_empty() { tokens.push(Token { text: String::new(), kind: TokenType::Normal }); }
         tokens
     }
 
-    // --- UTILS (Existants) ---
-    
     fn reset_blink(&mut self, cx: &mut Cx) {
         self.animator_play(cx, ids!(blink.on));
         cx.stop_timer(self.blink_timer);
@@ -229,9 +169,7 @@ impl EditorArea {
             cursor_col: self.cursor_col,
             selection_anchor: self.selection_anchor,
         });
-        if self.undo_stack.len() > 100 {
-            self.undo_stack.remove(0);
-        }
+        if self.undo_stack.len() > 100 { self.undo_stack.remove(0); }
         self.redo_stack.clear();
     }
 
@@ -268,14 +206,8 @@ impl EditorArea {
     fn get_selection_range(&self) -> Option<((usize, usize), (usize, usize))> {
         if let Some(anchor) = self.selection_anchor {
             let cursor = (self.cursor_line, self.cursor_col);
-            if anchor < cursor {
-                Some((anchor, cursor))
-            } else {
-                Some((cursor, anchor))
-            }
-        } else {
-            None
-        }
+            if anchor < cursor { Some((anchor, cursor)) } else { Some((cursor, anchor)) }
+        } else { None }
     }
     
     fn get_selected_text(&self) -> String {
@@ -316,11 +248,9 @@ impl EditorArea {
                 let start_line_str = &self.lines[start_line];
                 let start_byte = start_line_str.char_indices().nth(start_col).map(|(i,_)| i).unwrap_or(start_line_str.len());
                 let start_part = start_line_str[..start_byte].to_string();
-                
                 let end_line_str = &self.lines[end_line];
                 let end_byte = end_line_str.char_indices().nth(end_col).map(|(i,_)| i).unwrap_or(end_line_str.len());
                 let end_part = end_line_str[end_byte..].to_string();
-                
                 self.lines.drain(start_line + 1..=end_line);
                 self.lines[start_line] = start_part + &end_part;
             }
@@ -330,61 +260,32 @@ impl EditorArea {
         }
     }
 
-    fn move_cursor_to(&mut self, line: usize, col: usize) {
-        self.cursor_line = line.min(self.lines.len().saturating_sub(1));
-        let line_len = self.lines[self.cursor_line].chars().count();
-        self.cursor_col = col.min(line_len);
-    }
-    
-    fn pos_to_grid(&self, cx: &Cx, abs: DVec2) -> (usize, usize) {
-        let rect = self.area.rect(cx);
-        let rel = abs - rect.pos;
-        let line = (rel.y / self.cell_height).floor().max(0.0) as usize;
-        let col = (rel.x / self.cell_width).round().max(0.0) as usize;
-        let line = line.min(self.lines.len().saturating_sub(1));
-        let line_len = self.lines[line].chars().count();
-        let col = col.min(line_len);
-        (line, col)
-    }
-
     fn find_prev_word_start(&self) -> (usize, usize) {
-        let mut line_idx = self.cursor_line;
+        let line_idx = self.cursor_line;
         let mut col_idx = self.cursor_col;
         if col_idx == 0 {
-            if line_idx > 0 {
-                return (line_idx - 1, self.lines[line_idx - 1].chars().count());
-            }
+            if line_idx > 0 { return (line_idx - 1, self.lines[line_idx - 1].chars().count()); }
             return (0, 0);
         }
         let line = &self.lines[line_idx];
         let chars: Vec<char> = line.chars().collect();
-        while col_idx > 0 && col_idx <= chars.len() && chars[col_idx - 1].is_whitespace() {
-            col_idx -= 1;
-        }
-        while col_idx > 0 && col_idx <= chars.len() && !chars[col_idx - 1].is_whitespace() {
-            col_idx -= 1;
-        }
+        while col_idx > 0 && col_idx <= chars.len() && chars[col_idx - 1].is_whitespace() { col_idx -= 1; }
+        while col_idx > 0 && col_idx <= chars.len() && !chars[col_idx - 1].is_whitespace() { col_idx -= 1; }
         (line_idx, col_idx)
     }
 
     fn find_next_word_end(&self) -> (usize, usize) {
-        let mut line_idx = self.cursor_line;
+        let line_idx = self.cursor_line;
         let mut col_idx = self.cursor_col;
         let line = &self.lines[line_idx];
         let chars: Vec<char> = line.chars().collect();
         let len = chars.len();
         if col_idx >= len {
-            if line_idx < self.lines.len() - 1 {
-                return (line_idx + 1, 0);
-            }
+            if line_idx < self.lines.len() - 1 { return (line_idx + 1, 0); }
             return (line_idx, len);
         }
-        while col_idx < len && !chars[col_idx].is_whitespace() {
-            col_idx += 1;
-        }
-        while col_idx < len && chars[col_idx].is_whitespace() {
-            col_idx += 1;
-        }
+        while col_idx < len && !chars[col_idx].is_whitespace() { col_idx += 1; }
+        while col_idx < len && chars[col_idx].is_whitespace() { col_idx += 1; }
         (line_idx, col_idx)
     }
 
@@ -408,22 +309,10 @@ impl EditorArea {
             self.cursor_col = prev_line_len;
         }
     }
-    
-    fn measure_cells(&mut self, cx: &mut Cx2d) {
-        let text = self.draw_text.layout(cx, 0.0, 0.0, None, false, Align::default(), "M");
-        if let Some(row) = text.rows.first() {
-            if let Some(glyph) = row.glyphs.first() {
-                self.cell_width = glyph.advance_in_lpxs() as f64;
-                self.cell_height = (glyph.ascender_in_lpxs() - glyph.descender_in_lpxs()) as f64;
-                if self.cell_width < 1.0 { self.cell_width = 8.0; }
-                if self.cell_height < 1.0 { self.cell_height = 16.0; }
-            }
-        }
-    }
 }
 
 impl Widget for EditorArea {
-    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
         if self.blink_timer.is_event(event).is_some() {
             if self.animator_in_state(cx, ids!(blink.off)) {
                 self.animator_play(cx, ids!(blink.on));
@@ -436,14 +325,11 @@ impl Widget for EditorArea {
 
         match event.hits(cx, self.area) {
             Hit::KeyFocus(_) => {
-                // Force IME update on focus
-                let cursor_x = (self.cursor_col as f64 * self.cell_width);
-                let cursor_y = (self.cursor_line as f64 * self.cell_height * 1.15);
-                cx.show_text_ime(self.area, dvec2(cursor_x, cursor_y));
+                let cursor_y = self.cursor_line as f64 * self.line_height;
+                cx.show_text_ime(self.area, dvec2(self.caret_x_geom, cursor_y));
                 self.redraw(cx);
             }
-            Hit::KeyFocusLost(_) => {
-            }
+            Hit::KeyFocusLost(_) => {}
             
             Hit::KeyDown(ke) => {
                 let shift = ke.modifiers.shift;
@@ -595,10 +481,8 @@ impl Widget for EditorArea {
                     self.save_state();
                     self.reset_blink(cx);
                     self.delete_selection();
-                    
                     let line = &self.lines[self.cursor_line];
                     let byte_idx = line.char_indices().nth(self.cursor_col).map(|(i,_)| i).unwrap_or(line.len());
-                    
                     self.lines[self.cursor_line].insert_str(byte_idx, &clean_input);
                     self.cursor_col += clean_input.chars().count();
                     self.redraw(cx);
@@ -611,7 +495,16 @@ impl Widget for EditorArea {
             Hit::FingerDown(fe) => {
                 cx.set_key_focus(self.area);
                 self.reset_blink(cx);
-                let (line, col) = self.pos_to_grid(cx, fe.abs);
+                let avg_width = 8.0; 
+                let rect = self.area.rect(cx);
+                let rel = fe.abs - rect.pos;
+                let line = (rel.y / self.line_height).floor().max(0.0) as usize;
+                let col = (rel.x / avg_width).round().max(0.0) as usize;
+                let line = line.min(self.lines.len().saturating_sub(1));
+                let line_len = self.lines[line].chars().count();
+                let col = col.min(line_len);
+                self.cursor_line = line;
+                self.cursor_col = col;
                 if fe.modifiers.shift {
                      if self.selection_anchor.is_none() {
                         self.selection_anchor = Some((self.cursor_line, self.cursor_col));
@@ -619,7 +512,6 @@ impl Widget for EditorArea {
                 } else {
                     self.selection_anchor = None;
                 }
-                self.move_cursor_to(line, col);
                 if !fe.modifiers.shift {
                     self.selection_anchor = Some((self.cursor_line, self.cursor_col));
                 }
@@ -628,8 +520,16 @@ impl Widget for EditorArea {
             }
             Hit::FingerMove(fe) => {
                 if self.is_dragging {
-                    let (line, col) = self.pos_to_grid(cx, fe.abs);
-                    self.move_cursor_to(line, col);
+                    let avg_width = 8.0;
+                    let rect = self.area.rect(cx);
+                    let rel = fe.abs - rect.pos;
+                    let line = (rel.y / self.line_height).floor().max(0.0) as usize;
+                    let col = (rel.x / avg_width).round().max(0.0) as usize;
+                    let line = line.min(self.lines.len().saturating_sub(1));
+                    let line_len = self.lines[line].chars().count();
+                    let col = col.min(line_len);
+                    self.cursor_line = line;
+                    self.cursor_col = col;
                     self.redraw(cx);
                 }
             }
@@ -648,60 +548,132 @@ impl Widget for EditorArea {
     
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
         cx.begin_turtle(walk, self.layout);
-        self.measure_cells(cx);
         let rect = cx.turtle().rect();
         self.draw_bg.draw_abs(cx, rect);
         
-        let line_height = self.cell_height * 1.15; 
+        self.line_height = 18.0; 
         
         for (line_idx, line) in self.lines.iter().enumerate() {
             let pos = cx.turtle().pos();
             let start_x = pos.x;
-            let y_pos = pos.y;
+            // FIXED: Manual Y calculation to ensure consistent spacing
+            let y_pos = start_x + (line_idx as f64 * self.line_height); // Oups, c'est rect.pos.y ou pos.y initial
             
-            // Dessin Sélection
-            if let Some(((start_l, start_c), (end_l, end_c))) = self.get_selection_range() {
-                if line_idx >= start_l && line_idx <= end_l {
-                    let sel_start_col = if line_idx == start_l { start_c } else { 0 };
-                    let sel_end_col = if line_idx == end_l { end_c } else { line.chars().count() };
-                    let sel_x = start_x + (sel_start_col as f64 * self.cell_width);
-                    let mut sel_w = (sel_end_col.saturating_sub(sel_start_col)) as f64 * self.cell_width;
-                    if line_idx != end_l { sel_w += self.cell_width * 0.5; }
-                    if sel_w < 1.0 { sel_w = self.cell_width * 0.5; } 
-                    self.draw_selection.draw_abs(cx, Rect {
-                        pos: dvec2(sel_x, y_pos),
-                        size: dvec2(sel_w, line_height),
-                    });
-                }
-            }
+            // Correction Y pos: On utilise le rect.pos.y comme base absolue
+            let y_pos = rect.pos.y + (line_idx as f64 * self.line_height) + self.layout.padding.top;
             
-            // --- DESSIN PAR TOKENS (Markdown) ---
             let tokens = self.tokenize_line(line);
+            let mut current_x = start_x + self.layout.padding.left; // Apply padding left
+            
+            let mut char_count_so_far = 0;
+            let mut cursor_x_final = current_x;
+            let mut found_cursor = false;
+            let mut sel_rects = Vec::new();
+            
             for token in tokens {
-                self.draw_text.color = self.get_color_for_token(token.kind);
-                self.draw_text.draw_walk(cx, Walk::fit(), Align::default(), &token.text);
+                // Inline style logic
+                self.draw_text.color = match token.kind {
+                    TokenType::Header => vec4(0.53, 0.75, 0.81, 1.0),
+                    TokenType::Bold => vec4(0.92, 0.79, 0.54, 1.0),
+                    TokenType::Italic => vec4(0.71, 0.55, 0.67, 1.0),
+                    TokenType::Code => vec4(0.63, 0.74, 0.54, 1.0),
+                    TokenType::Link => vec4(0.36, 0.54, 0.66, 1.0),
+                    TokenType::Normal => vec4(0.92, 0.93, 0.95, 1.0),
+                };
+
+                match token.kind {
+                    TokenType::Header => { self.draw_text.text_style.font_size = 14.0; },
+                    TokenType::Bold => { self.draw_text.text_style.font_size = 10.5; },
+                    _ => { self.draw_text.text_style.font_size = 10.0; }
+                }
+
+                let text_layout = self.draw_text.layout(cx, 0.0, 0.0, None, false, Align::default(), &token.text);
+                let token_width = text_layout.size_in_lpxs.width as f64;
+                let token_len = token.text.chars().count();
+                
+                if line_idx == self.cursor_line && !found_cursor {
+                    if self.cursor_col >= char_count_so_far && self.cursor_col <= char_count_so_far + token_len {
+                        let local_idx = self.cursor_col - char_count_so_far;
+                        if local_idx == 0 {
+                            cursor_x_final = current_x;
+                        } else if local_idx == token_len {
+                            cursor_x_final = current_x + token_width;
+                        } else {
+                            let sub_text: String = token.text.chars().take(local_idx).collect();
+                            let sub_layout = self.draw_text.layout(cx, 0.0, 0.0, None, false, Align::default(), &sub_text);
+                            cursor_x_final = current_x + sub_layout.size_in_lpxs.width as f64;
+                        }
+                        found_cursor = true;
+                    }
+                }
+                
+                if let Some(((start_l, _start_c), (end_l, _end_c))) = self.get_selection_range() {
+                    if line_idx >= start_l && line_idx <= end_l {
+                        let tok_start = char_count_so_far;
+                        let tok_end = char_count_so_far + token_len;
+                        let sel_start = if line_idx == start_l { self.get_selection_range().unwrap().0.1 } else { 0 };
+                        let sel_end = if line_idx == end_l { self.get_selection_range().unwrap().1.1 } else { 999999 };
+                        let intersect_start = tok_start.max(sel_start);
+                        let intersect_end = tok_end.min(sel_end);
+                        if intersect_start < intersect_end {
+                            let rel_s = intersect_start - tok_start;
+                            let rel_e = intersect_end - tok_start;
+                            let w_start = if rel_s == 0 { 0.0 } else {
+                                let s: String = token.text.chars().take(rel_s).collect();
+                                self.draw_text.layout(cx, 0.0, 0.0, None, false, Align::default(), &s).size_in_lpxs.width as f64
+                            };
+                            let w_end = if rel_e == token_len { token_width } else {
+                                let s: String = token.text.chars().take(rel_e).collect();
+                                self.draw_text.layout(cx, 0.0, 0.0, None, false, Align::default(), &s).size_in_lpxs.width as f64
+                            };
+                            sel_rects.push(Rect {
+                                pos: dvec2(current_x + w_start, y_pos),
+                                size: dvec2(w_end - w_start, self.line_height)
+                            });
+                        }
+                    }
+                }
+                
+                self.draw_text.draw_abs(cx, dvec2(current_x, y_pos), &token.text);
+                current_x += token_width;
+                char_count_so_far += token_len;
             }
             
-            // Dessin Curseur
+            for r in sel_rects {
+                self.draw_selection.draw_abs(cx, r);
+            }
+            
+            if let Some(((start_l, _), (end_l, _))) = self.get_selection_range() {
+                 if line_idx >= start_l && line_idx < end_l {
+                     self.draw_selection.draw_abs(cx, Rect {
+                        pos: dvec2(current_x, y_pos),
+                        size: dvec2(5.0, self.line_height)
+                    });
+                 }
+            }
+            
             if line_idx == self.cursor_line {
-                let cursor_x = start_x + (self.cursor_col as f64 * self.cell_width);
+                if !found_cursor && self.cursor_col == char_count_so_far {
+                     cursor_x_final = current_x;
+                }
+                self.caret_x_geom = cursor_x_final;
                 self.draw_cursor.draw_abs(cx, Rect {
-                    pos: dvec2(cursor_x, y_pos),
-                    size: dvec2(2.0, line_height),
+                    pos: dvec2(cursor_x_final, y_pos),
+                    size: dvec2(2.0, self.line_height),
                 });
             }
-            
-            cx.turtle_new_line();
+            // REMOVED cx.turtle_new_line();
         }
+        
+        // IMPORTANT: Set the used area so layout/scrolling works
+        let total_height = self.lines.len() as f64 * self.line_height + self.layout.padding.top + self.layout.padding.bottom;
+        cx.turtle_mut().set_used(rect.size.x, total_height);
         
         cx.end_turtle_with_area(&mut self.area);
-        
         if cx.has_key_focus(self.area) {
-             let cursor_x = (self.cursor_col as f64 * self.cell_width);
-             let cursor_y = (self.cursor_line as f64 * self.cell_height * 1.15); 
-             cx.show_text_ime(self.area, dvec2(cursor_x, cursor_y));
+             let cursor_y = self.cursor_line as f64 * self.line_height * 1.15; 
+             cx.show_text_ime(self.area, dvec2(self.caret_x_geom, cursor_y));
         }
-        
         DrawStep::done()
     }
 }
