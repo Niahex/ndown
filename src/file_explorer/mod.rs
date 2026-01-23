@@ -26,25 +26,27 @@ live_design! {
             FileItem = <View> {
                 width: Fill, height: 30, flow: Right, align: {y: 0.5}, padding: 5
                 show_bg: true
-                draw_bg: {
-                    instance hover: 0.0
-                    color: #4c566a00
-                    fn pixel(self) -> vec4 {
-                        return mix(self.color, #4c566a, self.hover);
-                    }
-                }
-                
+                        draw_bg: {
+                            instance hover: 0.0
+                            instance down: 0.0
+                            color: #4c566a00
+                            fn pixel(self) -> vec4 {
+                                return mix(mix(self.color, #4c566a, self.hover), #3b4252, self.down);
+                            }
+                        }
+                        
                         animator: {
                             hover = {
                                 default: off
                                 off = { from: {all: Forward {duration: 0.1}} apply: { draw_bg: {hover: 0.0} } }
                                 on = { from: {all: Forward {duration: 0.1}} apply: { draw_bg: {hover: 1.0} } }
                             }
-                                        down = {
-                                            default: off
-                                            off = { from: {all: Forward {duration: 0.1}} apply: { draw_bg: {hover: 0.0} } }
-                                            on = { from: {all: Forward {duration: 0.1}} apply: { draw_bg: {hover: 1.0} } }
-                                        }                        }                
+                            down = {
+                                default: off
+                                off = { from: {all: Forward {duration: 0.1}} apply: { draw_bg: {down: 0.0} } }
+                                on = { from: {all: Forward {duration: 0.1}} apply: { draw_bg: {down: 1.0} } }
+                            }
+                        }                
                 icon = <Label> { text: "📄", draw_text: { color: #88c0d0 } }
                 name = <Label> { 
                     text: "filename.md", 
