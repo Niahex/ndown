@@ -1,9 +1,9 @@
 use makepad_widgets::*;
 
-live_design!{
+live_design! {
     use link::theme::*;
     use link::widgets::*;
-        
+
     pub OutlinePanel = {{OutlinePanel}}{
         view: <View> {
             width: 250, height: Fill
@@ -11,7 +11,7 @@ live_design!{
             show_bg: true
             draw_bg: { color: #434c5e }
             visible: true
-            
+
             <Label> {
                 margin: {top: 20}
                 text: "# Heading 1\n## Heading 2\n### Heading 3"
@@ -23,19 +23,21 @@ live_design!{
         }
     }
 }
- 
-#[derive(Live, Widget)] 
-pub struct OutlinePanel{
-    #[deref] #[live] view: View
+
+#[derive(Live, Widget)]
+pub struct OutlinePanel {
+    #[deref]
+    #[live]
+    view: View,
 }
 
-impl LiveHook for OutlinePanel{}
+impl LiveHook for OutlinePanel {}
 
 impl Widget for OutlinePanel {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
         self.view.handle_event(cx, event, scope)
     }
-    
+
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
         self.view.draw_walk(cx, scope, walk)
     }

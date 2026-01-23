@@ -3,7 +3,7 @@ use makepad_widgets::*;
 live_design! {
     use link::theme::*;
     use link::widgets::*;
-    
+
     pub TabItem = {{TabItem}} {
         view: <View> {
             width: Fit, height: Fit
@@ -11,10 +11,10 @@ live_design! {
             spacing: 5
             flow: Right
             show_bg: true
-            draw_bg: { 
+            draw_bg: {
                 color: #4c566a
             }
-            
+
             <Label> {
                 text: "document.md"
                 draw_text: {
@@ -22,23 +22,23 @@ live_design! {
                     color: #eceff4
                 }
             }
-            
+
             close_btn = <Button> {
                 text: "×"
-                draw_text: { 
+                draw_text: {
                     color: #d8dee9
                     text_style: <THEME_FONT_REGULAR> {font_size: 14}
                 }
             }
         }
     }
-    
+
     pub TabBar = {{TabBar}} {
         view: <View> {
             width: Fill, height: Fit
             flow: Right, spacing: 5
             padding: {left: 5, right: 5}
-            
+
             <TabItem> {}
             <TabItem> {}
         }
@@ -47,7 +47,9 @@ live_design! {
 
 #[derive(Live, Widget)]
 pub struct TabItem {
-    #[deref] #[live] view: View,
+    #[deref]
+    #[live]
+    view: View,
 }
 
 impl LiveHook for TabItem {}
@@ -56,7 +58,7 @@ impl Widget for TabItem {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
         self.view.handle_event(cx, event, scope);
     }
-    
+
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
         self.view.draw_walk(cx, scope, walk)
     }
@@ -64,7 +66,9 @@ impl Widget for TabItem {
 
 #[derive(Live, Widget)]
 pub struct TabBar {
-    #[deref] #[live] view: View,
+    #[deref]
+    #[live]
+    view: View,
 }
 
 impl LiveHook for TabBar {}
@@ -73,7 +77,7 @@ impl Widget for TabBar {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
         self.view.handle_event(cx, event, scope);
     }
-    
+
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
         self.view.draw_walk(cx, scope, walk)
     }

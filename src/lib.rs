@@ -1,9 +1,9 @@
 pub use makepad_widgets;
 use makepad_widgets::*;
 
-pub mod ui;
 pub mod app;
 pub mod model;
+pub mod ui;
 
 pub fn live_design(cx: &mut Cx) {
     makepad_widgets::live_design(cx);

@@ -4,31 +4,31 @@ live_design! {
     use link::theme::*;
     use link::shaders::*;
     use link::widgets::*;
-    
+
     use crate::ui::top_bar::*;
     use crate::ui::file_explorer::*;
     use crate::ui::outline_panel::*;
     use crate::ui::editor::*;
-    
+
     App = {{App}} {
         ui: <Window> {
             window: {inner_size: vec2(1400, 900)},
             pass: {clear_color: #2e3440},
-            
+
             body = <View> {
                 width: Fill, height: Fill
                 flow: Down
-                
+
                 top_bar = <TopBar> {}
-                
+
                 content = <View> {
                     width: Fill, height: Fill
                     flow: Right
-                    
+
                     left_sidebar = <FileExplorer> {}
-                    
+
                     editor = <EditorArea> {}
-                    
+
                     right_sidebar = <OutlinePanel> {}
                 }
             }
@@ -40,9 +40,12 @@ app_main!(App);
 
 #[derive(Live, LiveHook)]
 pub struct App {
-    #[live] ui: WidgetRef,
-    #[rust] left_visible: bool,
-    #[rust] right_visible: bool,
+    #[live]
+    ui: WidgetRef,
+    #[rust]
+    left_visible: bool,
+    #[rust]
+    right_visible: bool,
 }
 
 impl LiveRegister for App {
@@ -53,22 +56,38 @@ impl LiveRegister for App {
 
 impl MatchEvent for App {
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
-        if self.ui.button(ids!(body.top_bar.left_toggle)).clicked(actions) {
+        if self
+            .ui
+            .button(ids!(body.top_bar.left_toggle))
+            .clicked(actions)
+        {
             self.left_visible = !self.left_visible;
             if self.left_visible {
-                self.ui.view(ids!(body.content.left_sidebar)).apply_over(cx, live!{width: 250});
+                self.ui
+                    .view(ids!(body.content.left_sidebar))
+                    .apply_over(cx, live! {width: 250});
             } else {
-                self.ui.view(ids!(body.content.left_sidebar)).apply_over(cx, live!{width: 0});
+                self.ui
+                    .view(ids!(body.content.left_sidebar))
+                    .apply_over(cx, live! {width: 0});
             }
             self.ui.redraw(cx);
         }
-        
-        if self.ui.button(ids!(body.top_bar.right_toggle)).clicked(actions) {
+
+        if self
+            .ui
+            .button(ids!(body.top_bar.right_toggle))
+            .clicked(actions)
+        {
             self.right_visible = !self.right_visible;
             if self.right_visible {
-                self.ui.view(ids!(body.content.right_sidebar)).apply_over(cx, live!{width: 250});
+                self.ui
+                    .view(ids!(body.content.right_sidebar))
+                    .apply_over(cx, live! {width: 250});
             } else {
-                self.ui.view(ids!(body.content.right_sidebar)).apply_over(cx, live!{width: 0});
+                self.ui
+                    .view(ids!(body.content.right_sidebar))
+                    .apply_over(cx, live! {width: 0});
             }
             self.ui.redraw(cx);
         }

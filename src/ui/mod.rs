@@ -1,9 +1,9 @@
-pub mod top_bar;
+pub mod editor;
 pub mod file_explorer;
 pub mod outline_panel;
-pub mod editor;
+pub mod top_bar;
 
-pub use top_bar::TopBar;
+pub use editor::EditorArea;
 pub use file_explorer::FileExplorer;
 pub use outline_panel::OutlinePanel;
-pub use editor::EditorArea;
+pub use top_bar::TopBar;
