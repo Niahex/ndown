@@ -1,8 +1,8 @@
 use crate::markdown::inline::{parse_inline_formatting, InlineFormat};
 
-pub struct InlineFormatter;
+pub struct FormattingManager;
 
-impl InlineFormatter {
+impl FormattingManager {
     pub fn toggle_bold(text: &str, cursor_pos: usize) -> (String, usize) {
         Self::toggle_format(text, cursor_pos, "**", InlineFormat::Bold)
     }
@@ -15,13 +15,25 @@ impl InlineFormatter {
         Self::toggle_format(text, cursor_pos, "`", InlineFormat::Code)
     }
     
+    pub fn wrap_selection(text: &str, start: usize, end: usize, marker: &str) -> String {
+        if start >= end || end > text.len() {
+            return text.to_string();
+        }
+        
+        let before = &text[..start];
+        let selection = &text[start..end];
+        let after = &text[end..];
+        
+        format!("{}{}{}{}{}", before, marker, selection, marker, after)
+    }
+    
     fn toggle_format(text: &str, cursor_pos: usize, marker: &str, format_type: InlineFormat) -> (String, usize) {
         let spans = parse_inline_formatting(text);
         
-        // Check if cursor is inside an existing span of this type
+        // Check if cursor is inside existing span
         for span in &spans {
             if span.format == format_type && cursor_pos >= span.range.start && cursor_pos <= span.range.end {
-                // Remove the formatting
+                // Remove formatting
                 let before = &text[..span.range.start];
                 let content = match format_type {
                     InlineFormat::Bold => &text[span.range.start + 2..span.range.end - 2],
@@ -39,24 +51,12 @@ impl InlineFormatter {
             }
         }
         
-        // No existing formatting at cursor, add new formatting
+        // Add new formatting
         let before = &text[..cursor_pos];
         let after = &text[cursor_pos..];
         let new_text = format!("{}{}{}{}", before, marker, marker, after);
         let new_cursor = cursor_pos + marker.len();
         
         (new_text, new_cursor)
-    }
-    
-    pub fn wrap_selection(text: &str, start: usize, end: usize, marker: &str) -> String {
-        if start >= end || end > text.len() {
-            return text.to_string();
-        }
-        
-        let before = &text[..start];
-        let selection = &text[start..end];
-        let after = &text[end..];
-        
-        format!("{}{}{}{}{}", before, marker, selection, marker, after)
     }
 }

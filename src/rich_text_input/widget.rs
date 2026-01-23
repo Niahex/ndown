@@ -1,9 +1,16 @@
 use makepad_widgets::*;
-use crate::markdown::inline::{parse_inline_formatting, InlineFormat};
-use crate::rich_text_editor::{cursor::CursorManager, events::EventManager, history::HistoryManager, types::*};
+use crate::markdown::inline::InlineFormat;
+use crate::rich_text_input::{
+    cursor::CursorManager, 
+    events::EventManager, 
+    history::HistoryManager, 
+    types::*, 
+    formatting::FormattingManager,
+    text_mapping::TextMapping
+};
 
 live_design! {
-    RichTextEditorBase = {{RichTextEditor}} {
+    RichTextInputBase = {{RichTextInput}} {
         width: Fill, height: Fit
         padding: 10
         
@@ -70,7 +77,7 @@ live_design! {
 }
 
 #[derive(Live, Widget)]
-pub struct RichTextEditor {
+pub struct RichTextInput {
     #[walk] walk: Walk,
     #[layout] layout: Layout,
     #[redraw] #[rust] area: Area,
@@ -91,6 +98,7 @@ pub struct RichTextEditor {
     #[rust] text_positions: Vec<(usize, f64)>,
     #[rust] is_dragging: bool,
     #[rust] clipboard_content: Option<String>,
+    #[rust] text_mapping: TextMapping,
     
     // Modular components
     #[rust] cursor: CursorManager,
@@ -98,13 +106,13 @@ pub struct RichTextEditor {
     #[rust] history: HistoryManager,
 }
 
-impl LiveHook for RichTextEditor {
+impl LiveHook for RichTextInput {
     fn after_apply(&mut self, cx: &mut Cx, _apply: &mut Apply, _index: usize, _nodes: &[LiveNode]) {
         self.draw_bg.redraw(cx);
     }
 }
 
-impl Widget for RichTextEditor {
+impl Widget for RichTextInput {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
         // Handle clipboard events
         match event {
@@ -131,7 +139,7 @@ impl Widget for RichTextEditor {
             Event::KeyDown(ke) => {
                 self.handle_key_down(cx, ke);
             }
-            Event::KeyUp(ke) => {
+            Event::KeyUp(_ke) => {
                 self.events.stop_key_repeat(cx);
             }
             Event::TextInput(ti) => {
@@ -175,7 +183,7 @@ impl Widget for RichTextEditor {
     }
 }
 
-impl RichTextEditor {
+impl RichTextInput {
     // Public API
     pub fn text(&self) -> &str {
         &self.text
@@ -183,6 +191,7 @@ impl RichTextEditor {
     
     pub fn set_text(&mut self, text: String) {
         self.text = text;
+        self.update_mapping();
         self.cursor.position.char_index = self.cursor.position.char_index.min(self.text.len());
         self.cursor.clear_selection();
     }
@@ -193,6 +202,11 @@ impl RichTextEditor {
         self.text.insert_str(self.cursor.position.char_index, text);
         self.cursor.position.char_index += text.len();
         self.cursor.position = self.cursor.char_index_to_position(&self.text, self.cursor.position.char_index);
+        self.update_mapping();
+    }
+    
+    fn update_mapping(&mut self) {
+        self.text_mapping = TextMapping::from_text(&self.text);
     }
     
     // Event handlers
@@ -258,6 +272,16 @@ impl RichTextEditor {
                 self.events.start_key_repeat(cx, KeyCode::Delete);
                 cx.redraw_all();
             }
+            KeyCode::KeyB if ke.modifiers.control => {
+                self.save_undo_state();
+                self.apply_formatting_toggle("**");
+                cx.redraw_all();
+            }
+            KeyCode::KeyI if ke.modifiers.control => {
+                self.save_undo_state();
+                self.apply_formatting_toggle("*");
+                cx.redraw_all();
+            }
             KeyCode::KeyC if ke.modifiers.control => {
                 if let Some(selected) = self.cursor.get_selected_text(&self.text) {
                     cx.copy_to_clipboard(&selected);
@@ -305,6 +329,7 @@ impl RichTextEditor {
         self.text.insert_str(self.cursor.position.char_index, input);
         self.cursor.position.char_index += input.len();
         self.cursor.position = self.cursor.char_index_to_position(&self.text, self.cursor.position.char_index);
+        self.update_mapping();
         cx.redraw_all();
     }
     
@@ -401,6 +426,7 @@ impl RichTextEditor {
                 self.text.drain(start..end);
                 self.cursor.position.char_index = start;
                 self.cursor.position = self.cursor.char_index_to_position(&self.text, self.cursor.position.char_index);
+                self.update_mapping();
             }
             self.cursor.clear_selection();
         }
@@ -412,6 +438,7 @@ impl RichTextEditor {
         self.text.insert_str(self.cursor.position.char_index, text);
         self.cursor.position.char_index += text.len();
         self.cursor.position = self.cursor.char_index_to_position(&self.text, self.cursor.position.char_index);
+        self.update_mapping();
     }
     
     fn perform_backspace(&mut self) {
@@ -422,6 +449,7 @@ impl RichTextEditor {
             self.cursor.position.char_index -= 1;
             self.cursor.position = self.cursor.char_index_to_position(&self.text, self.cursor.position.char_index);
         }
+        self.update_mapping();
     }
     
     fn perform_delete(&mut self) {
@@ -430,6 +458,7 @@ impl RichTextEditor {
         } else if self.cursor.position.char_index < self.text.len() {
             self.text.remove(self.cursor.position.char_index);
         }
+        self.update_mapping();
     }
     
     fn select_word_at_position(&mut self, pos: usize) {
@@ -459,89 +488,43 @@ impl RichTextEditor {
     
     fn render_rich_text(&mut self, cx: &mut Cx2d) {
         self.text_positions.clear();
-        let spans = parse_inline_formatting(&self.text);
-        let mut last_end = 0;
         let mut current_x = 0.0;
         
-        let text_clone = self.text.clone();
-        
-        for span in spans {
-            if span.range.start > last_end {
-                let plain_text = &text_clone[last_end..span.range.start];
-                current_x = self.render_text_segment(cx, plain_text, current_x, last_end);
+        for segment in &self.text_mapping.segments {
+            let visual_text = &self.text_mapping.visual_text[segment.visual_start..segment.visual_end];
+            
+            // Store positions for visual text (for cursor positioning)
+            for (i, _) in visual_text.char_indices() {
+                self.text_positions.push((segment.visual_start + i, current_x));
+                current_x += 8.0;
             }
             
-            let (content, format) = match &span.format {
-                InlineFormat::Bold => {
-                    let content = &text_clone[span.range.start + 2..span.range.end - 2];
-                    (content, &span.format)
+            // Render with appropriate style
+            match &segment.format {
+                None => {
+                    self.draw_text.draw_walk(cx, Walk::fit(), Align::default(), visual_text);
                 }
-                InlineFormat::Italic => {
-                    let content = &text_clone[span.range.start + 1..span.range.end - 1];
-                    (content, &span.format)
+                Some(InlineFormat::Bold) => {
+                    self.draw_text_bold.draw_walk(cx, Walk::fit(), Align::default(), visual_text);
                 }
-                InlineFormat::Code => {
-                    let content = &text_clone[span.range.start + 1..span.range.end - 1];
-                    (content, &span.format)
+                Some(InlineFormat::Italic) => {
+                    self.draw_text_italic.draw_walk(cx, Walk::fit(), Align::default(), visual_text);
                 }
-                InlineFormat::Link { .. } | InlineFormat::WikiLink { .. } | InlineFormat::Image { .. } => {
-                    let content = &text_clone[span.range.start..span.range.end];
-                    (content, &span.format)
+                Some(InlineFormat::Code) => {
+                    self.draw_text_code.draw_walk(cx, Walk::fit(), Align::default(), visual_text);
                 }
-            };
-            
-            current_x = self.render_formatted_segment(cx, content, current_x, span.range.start, format);
-            last_end = span.range.end;
-        }
-        
-        if last_end < text_clone.len() {
-            self.render_text_segment(cx, &text_clone[last_end..], current_x, last_end);
-        }
-    }
-    
-    fn render_text_segment(&mut self, cx: &mut Cx2d, text: &str, start_x: f64, char_offset: usize) -> f64 {
-        let mut x = start_x;
-        
-        for (i, _) in text.char_indices() {
-            self.text_positions.push((char_offset + i, x));
-            x += 8.0;
-        }
-        
-        self.draw_text.draw_walk(cx, Walk::fit(), Align::default(), text);
-        x
-    }
-    
-    fn render_formatted_segment(&mut self, cx: &mut Cx2d, text: &str, start_x: f64, char_offset: usize, format: &InlineFormat) -> f64 {
-        let mut x = start_x;
-        
-        for (i, _) in text.char_indices() {
-            self.text_positions.push((char_offset + i, x));
-            x += 8.0;
-        }
-        
-        match format {
-            InlineFormat::Bold => {
-                self.draw_text_bold.draw_walk(cx, Walk::fit(), Align::default(), text);
-            }
-            InlineFormat::Italic => {
-                self.draw_text_italic.draw_walk(cx, Walk::fit(), Align::default(), text);
-            }
-            InlineFormat::Code => {
-                self.draw_text_code.draw_walk(cx, Walk::fit(), Align::default(), text);
-            }
-            InlineFormat::Link { text: link_text, url: _ } => {
-                self.draw_text_link.draw_walk(cx, Walk::fit(), Align::default(), link_text);
-            }
-            InlineFormat::WikiLink { text: wiki_text } => {
-                self.draw_text_wiki.draw_walk(cx, Walk::fit(), Align::default(), wiki_text);
-            }
-            InlineFormat::Image { alt, url: _ } => {
-                let display_text = format!("[IMG: {}]", alt);
-                self.draw_text_code.draw_walk(cx, Walk::fit(), Align::default(), &display_text);
+                Some(InlineFormat::Link { .. }) => {
+                    self.draw_text_link.draw_walk(cx, Walk::fit(), Align::default(), visual_text);
+                }
+                Some(InlineFormat::WikiLink { .. }) => {
+                    self.draw_text_wiki.draw_walk(cx, Walk::fit(), Align::default(), visual_text);
+                }
+                Some(InlineFormat::Image { .. }) => {
+                    let display = format!("[IMG: {}]", visual_text);
+                    self.draw_text_code.draw_walk(cx, Walk::fit(), Align::default(), &display);
+                }
             }
         }
-        
-        x
     }
     
     fn find_cursor_position_from_x(&self, click_x: f64) -> usize {
@@ -611,5 +594,28 @@ impl RichTextEditor {
             ..Walk::default()
         };
         self.draw_cursor.draw_walk(cx, cursor_walk);
+    }
+    
+    // Formatting methods
+    fn apply_formatting_toggle(&mut self, marker: &str) {
+        if let Some(selection) = &self.cursor.selection {
+            // Wrap selection
+            let (start, end) = selection.get_range();
+            self.text = FormattingManager::wrap_selection(&self.text, start, end, marker);
+            self.cursor.position.char_index = end + marker.len() * 2;
+        } else {
+            // Toggle at cursor
+            let (new_text, new_cursor) = match marker {
+                "**" => FormattingManager::toggle_bold(&self.text, self.cursor.position.char_index),
+                "*" => FormattingManager::toggle_italic(&self.text, self.cursor.position.char_index),
+                "`" => FormattingManager::toggle_code(&self.text, self.cursor.position.char_index),
+                _ => (self.text.clone(), self.cursor.position.char_index),
+            };
+            self.text = new_text;
+            self.cursor.position.char_index = new_cursor;
+        }
+        self.cursor.position = self.cursor.char_index_to_position(&self.text, self.cursor.position.char_index);
+        self.cursor.clear_selection();
+        self.update_mapping();
     }
 }

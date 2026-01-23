@@ -1,4 +1,4 @@
-use crate::rich_text_editor::types::*;
+use crate::rich_text_input::types::*;
 
 pub struct HistoryManager {
     entries: Vec<HistoryEntry>,

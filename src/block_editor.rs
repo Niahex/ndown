@@ -3,8 +3,7 @@ use makepad_widgets::text_input::TextInputAction;
 use crate::editor_state::EditorState;
 use crate::ui::{EventHandler, BlockRenderer};
 use crate::storage::{Storage, LocalStorage};
-use crate::ui::components::inline_formatter::InlineFormatter;
-use crate::rich_text_editor::RichTextEditor;
+use crate::rich_text_input::{RichTextInput, formatting::FormattingManager};
 use std::path::PathBuf;
 
 live_design! {
@@ -384,7 +383,7 @@ impl BlockEditor {
             let current_text = text_input.text();
             let cursor = text_input.cursor().index;
             
-            let (new_text, new_cursor) = InlineFormatter::toggle_bold(&current_text, cursor);
+            let (new_text, new_cursor) = FormattingManager::toggle_bold(&current_text, cursor);
             text_input.set_text(cx, &new_text);
             text_input.set_cursor(cx, makepad_draw::text::selection::Cursor {
                 index: new_cursor,
@@ -393,7 +392,7 @@ impl BlockEditor {
             
             // Update the block content
             if let Some(block) = self.editor_state.blocks_mut().get_mut(active_index) {
-                block.content = new_text;
+                block.content = new_text.to_string();
                 self.editor_state.mark_modified();
             }
             
@@ -408,7 +407,7 @@ impl BlockEditor {
             let current_text = text_input.text();
             let cursor = text_input.cursor().index;
             
-            let (new_text, new_cursor) = InlineFormatter::toggle_italic(&current_text, cursor);
+            let (new_text, new_cursor) = FormattingManager::toggle_italic(&current_text, cursor);
             text_input.set_text(cx, &new_text);
             text_input.set_cursor(cx, makepad_draw::text::selection::Cursor {
                 index: new_cursor,
@@ -417,7 +416,7 @@ impl BlockEditor {
             
             // Update the block content
             if let Some(block) = self.editor_state.blocks_mut().get_mut(active_index) {
-                block.content = new_text;
+                block.content = new_text.to_string();
                 self.editor_state.mark_modified();
             }
             
