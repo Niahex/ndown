@@ -1,3 +1,3 @@
 fn main() {
-    ndown::app_main()
+    ndown::app::app_main()
 }
