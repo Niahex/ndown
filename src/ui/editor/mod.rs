@@ -68,7 +68,7 @@ pub struct EditorArea{
     #[rust] deferred_finger_tap: Option<DVec2>,
     
     #[rust] block_y_offsets: Vec<f64>,
-    #[rust] last_rendered_width: f64, // Pour détecter le resize
+    #[rust] last_rendered_width: f64,
 }
 
 impl LiveHook for EditorArea{
@@ -159,6 +159,7 @@ impl Widget for EditorArea {
                 self.deferred_finger_tap = None;
                 self.redraw(cx);
             }
+            
             Hit::KeyDown(ke) => {
                 self.reset_blink(cx);
                 let shift = ke.modifiers.shift;
@@ -171,6 +172,7 @@ impl Widget for EditorArea {
                     }
                     return;
                 }
+                
                 if shift {
                     if self.selection_anchor.is_none() {
                         self.selection_anchor = Some((self.cursor_block, self.cursor_char));
@@ -183,6 +185,7 @@ impl Widget for EditorArea {
                         _ => {}
                     }
                 }
+
                 match ke.key_code {
                     KeyCode::ArrowUp => {
                         if self.cursor_block > 0 {
@@ -250,10 +253,15 @@ impl Widget for EditorArea {
                             if self.cursor_char < block.text_len() {
                                 self.document.remove_char_at(self.cursor_block, self.cursor_char);
                             } else if self.cursor_block < self.document.blocks.len() - 1 {
+                                // Merge with next block (Pull)
                                 let next_idx = self.cursor_block + 1;
-                                let next_block = self.document.blocks.remove(next_idx);
-                                self.document.blocks[self.cursor_block].content.extend(next_block.content);
-                                self.invalidate_layout();
+                                // Need to use document abstraction for merge
+                                // But document only has merge_with_prev.
+                                // Let's call merge_with_prev on next_idx!
+                                if let Some(_offset) = self.document.merge_block_with_prev(next_idx) {
+                                    // Le curseur reste où il est (fin du bloc courant), pas de changement
+                                    self.invalidate_layout();
+                                }
                             }
                         }
                     }
@@ -352,6 +360,7 @@ impl Widget for EditorArea {
                             }
                             self.selection_anchor = None;
                         }
+                        
                         let added = self.document.insert_text_at(self.cursor_block, self.cursor_char, &te.input);
                         self.cursor_char += added;
                         
@@ -365,6 +374,7 @@ impl Widget for EditorArea {
                             }
                         }
                     }
+                    
                     self.redraw(cx);
                 }
             }
@@ -379,7 +389,6 @@ impl Widget for EditorArea {
         let rect = cx.turtle().rect();
         let scroll = cx.turtle().scroll(); 
         
-        // Invalidation sur redimensionnement
         if rect.size.x != self.last_rendered_width {
             self.invalidate_layout();
             self.last_rendered_width = rect.size.x;
@@ -399,11 +408,6 @@ impl Widget for EditorArea {
             draw_cursor: &mut self.draw_cursor,
             draw_selection: &mut self.draw_selection,
         };
-        
-        // Cache management
-        // Si le cache est invalide (vide ou taille incohérente), on doit le reconstruire
-        // MAIS view.draw_document ne reconstruit pas, elle l'utilise.
-        // Donc si le cache est invalide, il faut le vider et le remplir.
         
         let is_cache_valid = !self.block_y_offsets.is_empty() && self.block_y_offsets.len() == self.document.blocks.len();
         
