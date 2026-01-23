@@ -11,7 +11,7 @@ live_design!{
     pub TopBar = {{TopBar}}{
         view: <View> {
             width: Fill, height: Fit
-            flow: Right, spacing: 0, padding: 10
+            flow: Right, spacing: 0, padding: {left: 10, right: 10, top: 10, bottom: 10}
             show_bg: true
             draw_bg: { color: #3b4252 }
             
@@ -20,8 +20,16 @@ live_design!{
                 draw_text: { color: #eceff4 }
             }
             
+            <View> {
+                width: 215, height: Fit
+            }
+            
             tabs = <TabBar> {
                 width: Fill
+            }
+            
+            <View> {
+                width: 215, height: Fit
             }
             
             right_toggle = <Button> {
