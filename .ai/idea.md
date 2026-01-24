@@ -1,0 +1,1 @@
+a la place de **bold** et **bold si c'est juste devant mot j'ai juste le mot mais si **bold sentence** c'est toutes la sentences mais en gros la conditions pour ne pas casser c'est que ** et a la fin d'un mot pas au debut pour fermer pour bien faire comprendre au parser.
