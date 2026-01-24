@@ -30,6 +30,7 @@ live_design! {
 
     pub EditorArea = {{EditorArea}}{
         width: Fill, height: Fill
+        padding: 25.0
         draw_bg: { color: #2e3440 }
 
         scroll_bars: <ScrollBars> {}
