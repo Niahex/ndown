@@ -12,6 +12,23 @@ live_design! {
             show_bg: true
             draw_bg: { color: (NORD_POLAR_1) }
             visible: true
+            clip_x: true
+
+            header = <View> {
+                width: Fill, height: Fit
+                flow: Right, spacing: 10, align: {y: 0.5}, margin: {bottom: 10}
+                
+                toggle_btn = <Button> {
+                    width: 30, height: 30
+                    text: "☰"
+                    draw_text: { color: (NORD_SNOW_2) }
+                }
+
+                <Label> {
+                    text: "STRUCTURE"
+                    draw_text: { text_style: <THEME_FONT_BOLD> {font_size: 12}, color: (NORD_FROST_2) }
+                }
+            }
 
             <Label> {
                 margin: {top: 20}

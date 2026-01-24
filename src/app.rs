@@ -21,20 +21,19 @@ live_design! {
 
             body = <View> {
                 width: Fill, height: Fill
-                flow: Down
+                flow: Right
 
-                top_bar = <TopBar> {}
+                left_sidebar = <FileExplorer> {}
 
-                content = <View> {
+                center = <View> {
                     width: Fill, height: Fill
-                    flow: Right
-
-                    left_sidebar = <FileExplorer> {}
-
+                    flow: Down
+                    
+                    top_bar = <TopBar> {}
                     editor = <EditorArea> {}
-
-                    right_sidebar = <OutlinePanel> {}
                 }
+
+                right_sidebar = <OutlinePanel> {}
             }
         }
     }
@@ -46,9 +45,9 @@ app_main!(App);
 pub struct App {
     #[live]
     ui: WidgetRef,
-    #[rust]
+    #[rust(true)]
     left_visible: bool,
-    #[rust]
+    #[rust(true)]
     right_visible: bool,
 }
 
@@ -60,50 +59,36 @@ impl LiveRegister for App {
 
 impl MatchEvent for App {
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
-        if self
-            .ui
-            .button(ids!(body.top_bar.left_toggle))
-            .clicked(actions)
-        {
+        // Toggle Gauche (File Explorer)
+        if self.ui.button(ids!(body.left_sidebar.header.toggle_btn)).clicked(actions) {
             self.left_visible = !self.left_visible;
             if self.left_visible {
-                self.ui
-                    .view(ids!(body.content.left_sidebar))
-                    .apply_over(cx, live! {width: 250});
+                self.ui.view(ids!(body.left_sidebar)).apply_over(cx, live! {width: 250});
             } else {
-                self.ui
-                    .view(ids!(body.content.left_sidebar))
-                    .apply_over(cx, live! {width: 0});
+                self.ui.view(ids!(body.left_sidebar)).apply_over(cx, live! {width: 50});
             }
             self.ui.redraw(cx);
         }
 
-        if self
-            .ui
-            .button(ids!(body.top_bar.right_toggle))
-            .clicked(actions)
-        {
+        // Toggle Droite (Outline Panel)
+        if self.ui.button(ids!(body.right_sidebar.header.toggle_btn)).clicked(actions) {
             self.right_visible = !self.right_visible;
             if self.right_visible {
-                self.ui
-                    .view(ids!(body.content.right_sidebar))
-                    .apply_over(cx, live! {width: 250});
+                self.ui.view(ids!(body.right_sidebar)).apply_over(cx, live! {width: 250});
             } else {
-                self.ui
-                    .view(ids!(body.content.right_sidebar))
-                    .apply_over(cx, live! {width: 0});
+                self.ui.view(ids!(body.right_sidebar)).apply_over(cx, live! {width: 50});
             }
             self.ui.redraw(cx);
         }
         
         // Gestion File Explorer via le helper
-        if let Some(file_explorer) = self.ui.file_explorer(ids!(body.content.left_sidebar)).borrow() {
+        if let Some(file_explorer) = self.ui.file_explorer(ids!(body.left_sidebar)).borrow() {
             if let Some(path) = file_explorer.handle_file_actions(cx, actions) {
                 // Mettre à jour le titre dans la TopBar
-                self.ui.label(ids!(body.top_bar.title)).set_text(cx, &path);
+                self.ui.label(ids!(body.center.top_bar.title)).set_text(cx, &path);
                 
                 // Charger le fichier dans l'éditeur
-                let mut editor = self.ui.editor_area(ids!(body.content.editor));
+                let mut editor = self.ui.editor_area(ids!(body.center.editor));
                 editor.load_file(cx, path);
             }
         }
@@ -123,10 +108,10 @@ impl AppMain for App {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
         if let Event::Startup = event {
             let initial_file = "story.md".to_string();
-            self.ui.label(ids!(body.top_bar.title)).set_text(cx, &initial_file);
-            self.ui.editor_area(ids!(body.content.editor)).load_file(cx, initial_file);
+            self.ui.label(ids!(body.center.top_bar.title)).set_text(cx, &initial_file);
+            self.ui.editor_area(ids!(body.center.editor)).load_file(cx, initial_file);
 
-            let editor = self.ui.view(ids!(body.content.editor));
+            let editor = self.ui.view(ids!(body.center.editor));
             cx.set_key_focus(editor.area());
         }
         self.match_event(cx, event);

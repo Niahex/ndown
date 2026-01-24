@@ -12,11 +12,6 @@ live_design! {
             show_bg: true
             draw_bg: { color: (NORD_POLAR_1) }
 
-            left_toggle = <Button> {
-                text: "☰"
-                draw_text: { color: (NORD_SNOW_2) }
-            }
-
             <View> { width: Fill }
 
             title = <Label> {
@@ -28,11 +23,6 @@ live_design! {
             }
 
             <View> { width: Fill }
-
-            right_toggle = <Button> {
-                text: "☰"
-                draw_text: { color: (NORD_SNOW_2) }
-            }
         }
     }
 }
