@@ -87,7 +87,7 @@ impl FileExplorer {
         self.files.sort();
     }
     
-    pub fn handle_file_actions(&mut self, _cx: &mut Cx, actions: &Actions) -> Option<String> {
+    pub fn handle_file_actions(&self, _cx: &mut Cx, actions: &Actions) -> Option<String> {
         let list = self.view.portal_list(ids!(file_list));
         for (item_id, item) in list.items_with_actions(actions) {
              if item.button(ids!(btn)).clicked(actions) {

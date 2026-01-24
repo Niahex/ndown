@@ -17,6 +17,5 @@ pub fn live_design(cx: &mut Cx) {
     editor::live_design(cx);
     file_explorer::live_design(cx);
     outline_panel::live_design(cx);
-    top_bar::tabs::live_design(cx);
     top_bar::live_design(cx);
 }

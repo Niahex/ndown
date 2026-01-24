@@ -1,13 +1,9 @@
 use makepad_widgets::*;
 
-pub mod tabs;
-pub use tabs::*;
-
 live_design! {
     use link::theme::*;
     use link::widgets::*;
     use crate::theme::*;
-    use crate::ui::top_bar::tabs::*;
 
     pub TopBar = {{TopBar}}{
         view: <View> {
@@ -21,17 +17,17 @@ live_design! {
                 draw_text: { color: (NORD_SNOW_2) }
             }
 
-            <View> {
-                width: 215, height: Fit
+            <View> { width: Fill }
+
+            title = <Label> {
+                text: "Ndown Editor"
+                draw_text: {
+                    text_style: <THEME_FONT_BOLD> {font_size: 14}
+                    color: (NORD_SNOW_2)
+                }
             }
 
-            tabs = <TabBar> {
-                width: Fill
-            }
-
-            <View> {
-                width: 215, height: Fit
-            }
+            <View> { width: Fill }
 
             right_toggle = <Button> {
                 text: "☰"

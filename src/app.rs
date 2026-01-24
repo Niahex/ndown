@@ -97,8 +97,11 @@ impl MatchEvent for App {
         }
         
         // Gestion File Explorer via le helper
-        if let Some(mut file_explorer) = self.ui.file_explorer(ids!(body.content.left_sidebar)).borrow_mut() {
+        if let Some(file_explorer) = self.ui.file_explorer(ids!(body.content.left_sidebar)).borrow() {
             if let Some(path) = file_explorer.handle_file_actions(cx, actions) {
+                // Mettre à jour le titre dans la TopBar
+                self.ui.label(ids!(body.top_bar.title)).set_text(cx, &path);
+                
                 // Charger le fichier dans l'éditeur
                 let mut editor = self.ui.editor_area(ids!(body.content.editor));
                 editor.load_file(cx, path);
@@ -119,6 +122,10 @@ impl MatchEvent for App {
 impl AppMain for App {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
         if let Event::Startup = event {
+            let initial_file = "story.md".to_string();
+            self.ui.label(ids!(body.top_bar.title)).set_text(cx, &initial_file);
+            self.ui.editor_area(ids!(body.content.editor)).load_file(cx, initial_file);
+
             let editor = self.ui.view(ids!(body.content.editor));
             cx.set_key_focus(editor.area());
         }
