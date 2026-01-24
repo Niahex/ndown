@@ -12,6 +12,13 @@ live_design! {
             show_bg: true
             draw_bg: { color: (NORD_POLAR_1) }
 
+            left_toggle = <Button> {
+                text: "☰"
+                width: 30, height: 30
+                draw_text: { color: (NORD_SNOW_2) }
+                visible: false // Hidden by default, shown when sidebar is closed
+            }
+
             <View> { width: Fill }
 
             title = <Label> {
@@ -23,6 +30,13 @@ live_design! {
             }
 
             <View> { width: Fill }
+
+            right_toggle = <Button> {
+                text: "☰"
+                width: 30, height: 30
+                draw_text: { color: (NORD_SNOW_2) }
+                visible: false // Hidden by default, shown when sidebar is closed
+            }
         }
     }
 }

@@ -59,29 +59,41 @@ impl LiveRegister for App {
 
 impl MatchEvent for App {
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
-        // Toggle Gauche (File Explorer)
-        if self.ui.button(ids!(body.left_sidebar.header.toggle_btn)).clicked(actions) {
-            self.left_visible = !self.left_visible;
-            if self.left_visible {
-                self.ui.view(ids!(body.left_sidebar)).apply_over(cx, live! {width: 250});
-            } else {
-                self.ui.view(ids!(body.left_sidebar)).apply_over(cx, live! {width: 50});
-            }
+        // --- GESTION DES TOGGLES (Ouverture/Fermeture) ---
+
+        // 1. Bouton "Ouvrir" Gauche (dans la TopBar)
+        if self.ui.button(ids!(body.center.top_bar.left_toggle)).clicked(actions) {
+            self.left_visible = true;
+            self.ui.view(ids!(body.left_sidebar)).apply_over(cx, live! {width: 250});
+            self.ui.button(ids!(body.center.top_bar.left_toggle)).apply_over(cx, live! {visible: false});
             self.ui.redraw(cx);
         }
 
-        // Toggle Droite (Outline Panel)
+        // 2. Bouton "Fermer" Gauche (dans la Sidebar)
+        if self.ui.button(ids!(body.left_sidebar.header.toggle_btn)).clicked(actions) {
+            self.left_visible = false;
+            self.ui.view(ids!(body.left_sidebar)).apply_over(cx, live! {width: 0});
+            self.ui.button(ids!(body.center.top_bar.left_toggle)).apply_over(cx, live! {visible: true});
+            self.ui.redraw(cx);
+        }
+
+        // 3. Bouton "Ouvrir" Droite (dans la TopBar)
+        if self.ui.button(ids!(body.center.top_bar.right_toggle)).clicked(actions) {
+            self.right_visible = true;
+            self.ui.view(ids!(body.right_sidebar)).apply_over(cx, live! {width: 250});
+            self.ui.button(ids!(body.center.top_bar.right_toggle)).apply_over(cx, live! {visible: false});
+            self.ui.redraw(cx);
+        }
+
+        // 4. Bouton "Fermer" Droite (dans la Sidebar)
         if self.ui.button(ids!(body.right_sidebar.header.toggle_btn)).clicked(actions) {
-            self.right_visible = !self.right_visible;
-            if self.right_visible {
-                self.ui.view(ids!(body.right_sidebar)).apply_over(cx, live! {width: 250});
-            } else {
-                self.ui.view(ids!(body.right_sidebar)).apply_over(cx, live! {width: 50});
-            }
+            self.right_visible = false;
+            self.ui.view(ids!(body.right_sidebar)).apply_over(cx, live! {width: 0});
+            self.ui.button(ids!(body.center.top_bar.right_toggle)).apply_over(cx, live! {visible: true});
             self.ui.redraw(cx);
         }
         
-        // Gestion File Explorer via le helper
+        // --- GESTION FICHIERS ---
         if let Some(file_explorer) = self.ui.file_explorer(ids!(body.left_sidebar)).borrow() {
             if let Some(path) = file_explorer.handle_file_actions(cx, actions) {
                 // Mettre à jour le titre dans la TopBar

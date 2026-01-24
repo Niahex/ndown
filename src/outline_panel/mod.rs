@@ -12,7 +12,6 @@ live_design! {
             show_bg: true
             draw_bg: { color: (NORD_POLAR_1) }
             visible: true
-            clip_x: true
 
             header = <View> {
                 width: Fill, height: Fit
