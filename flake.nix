@@ -49,6 +49,7 @@
                 file:
                   pkgs.lib.any file.hasExt [
                     "svg"
+                    "ttf"
                   ]
               )
               unfilteredRoot)

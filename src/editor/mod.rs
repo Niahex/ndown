@@ -28,6 +28,30 @@ live_design! {
     use link::theme::*;
     use link::widgets::*;
 
+    pub THEME_FONT_REGULAR = {
+        font_family: {
+            latin = font("crate://self/assets/fonts/UbuntuNerdFont-Regular.ttf", 0.0, 0.0),
+        }
+    }
+    
+    pub THEME_FONT_BOLD = {
+        font_family: {
+            latin = font("crate://self/assets/fonts/UbuntuNerdFont-Bold.ttf", 0.0, 0.0),
+        }
+    }
+    
+    pub THEME_FONT_ITALIC = {
+        font_family: {
+            latin = font("crate://self/assets/fonts/UbuntuNerdFont-Italic.ttf", 0.0, 0.0),
+        }
+    }
+
+    pub THEME_FONT_CODE = {
+        font_family: {
+            latin = font("crate://self/assets/fonts/UbuntuSansMonoNerdFont-Regular.ttf", 0.0, 0.0),
+        }
+    }
+
     pub EditorArea = {{EditorArea}}{
         width: Fill, height: Fill
         padding: 25.0
