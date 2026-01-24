@@ -10,7 +10,7 @@ live_design! {
             width: Fill, height: Fit
             flow: Right, spacing: 0, padding: {left: 10, right: 10, top: 10, bottom: 10}
             show_bg: true
-            draw_bg: { color: (NORD_POLAR_1) }
+            draw_bg: { color: (NORD_POLAR_0) }
 
             left_toggle = <Button> {
                 text: "☰"
