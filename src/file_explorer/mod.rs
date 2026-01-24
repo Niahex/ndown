@@ -2,6 +2,12 @@ use makepad_widgets::*;
 use std::fs;
 use std::path::PathBuf;
 
+#[derive(Clone, DefaultNone, Debug)]
+pub enum FileExplorerAction {
+    FileSelected(String),
+    None,
+}
+
 live_design! {
     use link::theme::*;
     use link::widgets::*;
@@ -22,35 +28,25 @@ live_design! {
             width: Fill, height: Fill
             flow: Down
 
-            // Le template doit être ICI
             FileItem = <View> {
-                width: Fill, height: 30, flow: Right, align: {y: 0.5}, padding: 5
-                show_bg: true
-                        draw_bg: {
-                            instance hover: 0.0
-                            instance down: 0.0
-                            color: #4c566a00
-                            fn pixel(self) -> vec4 {
-                                return mix(mix(self.color, #4c566a, self.hover), #3b4252, self.down);
-                            }
-                        }
-
-                        animator: {
-                            hover = {
-                                default: off
-                                off = { from: {all: Forward {duration: 0.1}} apply: { draw_bg: {hover: 0.0} } }
-                                on = { from: {all: Forward {duration: 0.1}} apply: { draw_bg: {hover: 1.0} } }
-                            }
-                            down = {
-                                default: off
-                                off = { from: {all: Forward {duration: 0.1}} apply: { draw_bg: {down: 0.0} } }
-                                on = { from: {all: Forward {duration: 0.1}} apply: { draw_bg: {down: 1.0} } }
-                            }
-                        }
-                icon = <Label> { text: "📄", draw_text: { color: #88c0d0 } }
-                name = <Label> {
-                    text: "filename.md",
-                    draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 11}, color: #d8dee9 }
+                width: Fill, height: 30, flow: Overlay
+                
+                content = <View> {
+                    width: Fill, height: Fill, flow: Right, align: {y: 0.5}, padding: 5
+                    
+                    icon = <Label> { text: "📄", draw_text: { color: #88c0d0 } }
+                    name = <Label> {
+                        text: "filename.md",
+                        draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 11}, color: #d8dee9 }
+                    }
+                }
+                
+                btn = <Button> {
+                    width: Fill, height: Fill
+                    draw_bg: {
+                        fn pixel(self) -> vec4 { return vec4(0.,0.,0.,0.); }
+                    }
+                    text: ""
                 }
             }
         }
@@ -81,7 +77,6 @@ impl FileExplorer {
             for entry in entries {
                 if let Ok(entry) = entry {
                     let name = entry.file_name().to_string_lossy().into_owned();
-                    // On affiche tout ce qui n'est pas caché pour l'instant
                     if !name.starts_with('.') {
                         self.files.push(name);
                     }
@@ -89,6 +84,16 @@ impl FileExplorer {
             }
         }
         self.files.sort();
+    }
+    
+    pub fn handle_file_actions(&mut self, _cx: &mut Cx, actions: &Actions) -> Option<String> {
+        let list = self.view.portal_list(ids!(file_list));
+        for (item_id, item) in list.items_with_actions(actions) {
+             if item.button(ids!(btn)).clicked(actions) {
+                 return self.files.get(item_id).cloned();
+             }
+        }
+        None
     }
 }
 
@@ -105,7 +110,7 @@ impl Widget for FileExplorer {
                     if item_id < self.files.len() {
                         let file_name = &self.files[item_id];
                         let item = list.item(cx, item_id, live_id!(FileItem));
-                        item.label(ids!(name)).set_text(cx, file_name);
+                        item.view(ids!(content)).label(ids!(name)).set_text(cx, file_name);
                         item.draw_all(cx, scope);
                     }
                 }

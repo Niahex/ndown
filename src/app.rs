@@ -1,5 +1,9 @@
 use makepad_widgets::*;
 
+// Imports nécessaires pour les actions et extensions de widgets
+use crate::file_explorer::*; 
+use crate::editor::*;
+
 live_design! {
     use link::theme::*;
     use link::shaders::*;
@@ -90,6 +94,24 @@ impl MatchEvent for App {
                     .apply_over(cx, live! {width: 0});
             }
             self.ui.redraw(cx);
+        }
+        
+        // Gestion File Explorer via le helper
+        if let Some(mut file_explorer) = self.ui.file_explorer(ids!(body.content.left_sidebar)).borrow_mut() {
+            if let Some(path) = file_explorer.handle_file_actions(cx, actions) {
+                // Charger le fichier dans l'éditeur
+                let mut editor = self.ui.editor_area(ids!(body.content.editor));
+                editor.load_file(cx, path);
+            }
+        }
+        
+        // Gestion des actions de l'éditeur (s'il en émet)
+        // Note: EditorArea n'émet pas encore d'actions WidgetAction formelles dans le code actuel,
+        // mais si on voulait écouter des événements:
+        for action in actions {
+            if let Some(EditorAction::FileLoaded) = action.as_widget_action().cast() {
+                makepad_widgets::log!("File loaded successfully.");
+            }
         }
     }
 }

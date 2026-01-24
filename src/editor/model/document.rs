@@ -345,14 +345,17 @@ impl Document {
         true
     }
 
-    pub fn wrap_selection(&mut self, block_idx: usize, start: usize, end: usize, marker: &str) {
-        if block_idx >= self.blocks.len() {
-            return;
+        pub fn wrap_selection(&mut self, block_idx: usize, start: usize, end: usize, marker: &str) -> bool {
+
+            if block_idx >= self.blocks.len() { return false; }
+
+            self.insert_text_at(block_idx, end, marker);
+
+            self.insert_text_at(block_idx, start, marker);
+
+            self.apply_inline_formatting(block_idx)
+
         }
-        self.insert_text_at(block_idx, end, marker);
-        self.insert_text_at(block_idx, start, marker);
-        self.apply_inline_formatting(block_idx);
-    }
 
     pub fn merge_block_with_prev(&mut self, block_idx: usize) -> Option<usize> {
         if block_idx == 0 || block_idx >= self.blocks.len() {
