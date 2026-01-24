@@ -2,6 +2,7 @@ pub use makepad_widgets;
 use makepad_widgets::*;
 
 pub mod app;
+pub mod theme;
 
 pub mod editor;
 pub mod file_explorer;
@@ -12,6 +13,7 @@ pub fn live_design(cx: &mut Cx) {
     makepad_widgets::live_design(cx);
     makepad_code_editor::live_design(cx);
 
+    theme::live_design(cx);
     editor::live_design(cx);
     file_explorer::live_design(cx);
     outline_panel::live_design(cx);

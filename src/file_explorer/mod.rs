@@ -11,17 +11,18 @@ pub enum FileExplorerAction {
 live_design! {
     use link::theme::*;
     use link::widgets::*;
+    use crate::theme::*;
 
     pub FileExplorer = {{FileExplorer}}{
         width: 250, height: Fill
         flow: Down, padding: 10
         show_bg: true
-        draw_bg: { color: #434c5e }
+        draw_bg: { color: (NORD_POLAR_1) }
 
         title = <Label> {
             margin: {bottom: 10}
             text: "EXPLORATEUR"
-            draw_text: { text_style: <THEME_FONT_BOLD> {font_size: 12}, color: #81a1c1 }
+            draw_text: { text_style: <THEME_FONT_BOLD> {font_size: 12}, color: (NORD_FROST_2) }
         }
 
         file_list = <PortalList> {
@@ -34,10 +35,10 @@ live_design! {
                 content = <View> {
                     width: Fill, height: Fill, flow: Right, align: {y: 0.5}, padding: 5
                     
-                    icon = <Label> { text: "📄", draw_text: { color: #88c0d0 } }
+                    icon = <Label> { text: "📄", draw_text: { color: (NORD_FROST_1) } }
                     name = <Label> {
                         text: "filename.md",
-                        draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 11}, color: #d8dee9 }
+                        draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 11}, color: (NORD_SNOW_0) }
                     }
                 }
                 

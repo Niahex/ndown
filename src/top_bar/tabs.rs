@@ -3,6 +3,7 @@ use makepad_widgets::*;
 live_design! {
     use link::theme::*;
     use link::widgets::*;
+    use crate::theme::*;
 
     pub TabItem = {{TabItem}} {
         view: <View> {
@@ -12,21 +13,21 @@ live_design! {
             flow: Right
             show_bg: true
             draw_bg: {
-                color: #4c566a
+                color: (NORD_POLAR_3)
             }
 
             <Label> {
                 text: "document.md"
                 draw_text: {
                     text_style: <THEME_FONT_REGULAR> {font_size: 12}
-                    color: #eceff4
+                    color: (NORD_SNOW_2)
                 }
             }
 
             close_btn = <Button> {
                 text: "×"
                 draw_text: {
-                    color: #d8dee9
+                    color: (NORD_SNOW_0)
                     text_style: <THEME_FONT_REGULAR> {font_size: 14}
                 }
             }

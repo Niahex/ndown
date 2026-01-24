@@ -6,8 +6,8 @@ use crate::editor::*;
 
 live_design! {
     use link::theme::*;
-    use link::shaders::*;
     use link::widgets::*;
+    use crate::theme::*;
 
     use crate::top_bar::*;
     use crate::file_explorer::*;
@@ -17,7 +17,7 @@ live_design! {
     App = {{App}} {
         ui: <Window> {
             window: {inner_size: vec2(1400, 900)},
-            pass: {clear_color: #2e3440},
+            pass: {clear_color: (NORD_POLAR_0)},
 
             body = <View> {
                 width: Fill, height: Fill

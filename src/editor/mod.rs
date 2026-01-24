@@ -27,6 +27,7 @@ impl EditorAreaRef {
 live_design! {
     use link::theme::*;
     use link::widgets::*;
+    use crate::theme::*;
 
     pub THEME_FONT_REGULAR = {
         font_family: {
@@ -55,24 +56,24 @@ live_design! {
     pub EditorArea = {{EditorArea}}{
         width: Fill, height: Fill
         padding: 25.0
-        draw_bg: { color: #2e3440 }
+        draw_bg: { color: (NORD_POLAR_0) }
 
         scroll_bars: <ScrollBars> {}
 
-        draw_text_reg: { text_style: <THEME_FONT_REGULAR> { font_size: 12.1 }, color: #eceff4 }
-        draw_text_bold: { text_style: <THEME_FONT_BOLD> { font_size: 12.1 }, color: #eceff4 }
-        draw_text_italic: { text_style: <THEME_FONT_ITALIC> { font_size: 12.1 }, color: #eceff4 }
-        draw_text_code: { text_style: <THEME_FONT_CODE> { font_size: 12.1 }, color: #a3be8c }
+        draw_text_reg: { text_style: <THEME_FONT_REGULAR> { font_size: 12.1 }, color: (NORD_SNOW_2) }
+        draw_text_bold: { text_style: <THEME_FONT_BOLD> { font_size: 12.1 }, color: (NORD_SNOW_2) }
+        draw_text_italic: { text_style: <THEME_FONT_ITALIC> { font_size: 12.1 }, color: (NORD_SNOW_2) }
+        draw_text_code: { text_style: <THEME_FONT_CODE> { font_size: 12.1 }, color: (NORD_AURORA_GREEN) }
 
-        draw_text_header1: { text_style: <THEME_FONT_BOLD> { font_size: 29.0 }, color: #88c0d0 }
-        draw_text_header2: { text_style: <THEME_FONT_BOLD> { font_size: 21.8 }, color: #81a1c1 }
-        draw_text_header3: { text_style: <THEME_FONT_BOLD> { font_size: 19.4 }, color: #81a1c1 }
-        draw_text_header4: { text_style: <THEME_FONT_BOLD> { font_size: 16.9 }, color: #81a1c1 }
-        draw_text_header5: { text_style: <THEME_FONT_BOLD> { font_size: 14.5 }, color: #81a1c1 }
-        draw_text_quote: { text_style: <THEME_FONT_ITALIC> { font_size: 13.3 }, color: #d08770 }
+        draw_text_header1: { text_style: <THEME_FONT_BOLD> { font_size: 29.0 }, color: (NORD_FROST_1) }
+        draw_text_header2: { text_style: <THEME_FONT_BOLD> { font_size: 21.8 }, color: (NORD_FROST_2) }
+        draw_text_header3: { text_style: <THEME_FONT_BOLD> { font_size: 19.4 }, color: (NORD_FROST_2) }
+        draw_text_header4: { text_style: <THEME_FONT_BOLD> { font_size: 16.9 }, color: (NORD_FROST_2) }
+        draw_text_header5: { text_style: <THEME_FONT_BOLD> { font_size: 14.5 }, color: (NORD_FROST_2) }
+        draw_text_quote: { text_style: <THEME_FONT_ITALIC> { font_size: 13.3 }, color: (NORD_AURORA_ORANGE) }
 
         draw_cursor: { color: #ffffff }
-        draw_selection: { color: #4c566a }
+        draw_selection: { color: (NORD_POLAR_3) }
 
         animator: {
             blink = {

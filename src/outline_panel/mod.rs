@@ -3,13 +3,14 @@ use makepad_widgets::*;
 live_design! {
     use link::theme::*;
     use link::widgets::*;
+    use crate::theme::*;
 
     pub OutlinePanel = {{OutlinePanel}}{
         view: <View> {
             width: 250, height: Fill
             flow: Down, padding: 10
             show_bg: true
-            draw_bg: { color: #434c5e }
+            draw_bg: { color: (NORD_POLAR_1) }
             visible: true
 
             <Label> {
@@ -17,7 +18,7 @@ live_design! {
                 text: "# Heading 1\n## Heading 2\n### Heading 3"
                 draw_text: {
                     text_style: <THEME_FONT_REGULAR> {font_size: 14}
-                    color: #d8dee9
+                    color: (NORD_SNOW_0)
                 }
             }
         }

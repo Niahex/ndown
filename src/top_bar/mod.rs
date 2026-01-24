@@ -6,6 +6,7 @@ pub use tabs::*;
 live_design! {
     use link::theme::*;
     use link::widgets::*;
+    use crate::theme::*;
     use crate::ui::top_bar::tabs::*;
 
     pub TopBar = {{TopBar}}{
@@ -13,11 +14,11 @@ live_design! {
             width: Fill, height: Fit
             flow: Right, spacing: 0, padding: {left: 10, right: 10, top: 10, bottom: 10}
             show_bg: true
-            draw_bg: { color: #3b4252 }
+            draw_bg: { color: (NORD_POLAR_1) }
 
             left_toggle = <Button> {
                 text: "☰"
-                draw_text: { color: #eceff4 }
+                draw_text: { color: (NORD_SNOW_2) }
             }
 
             <View> {
@@ -34,7 +35,7 @@ live_design! {
 
             right_toggle = <Button> {
                 text: "☰"
-                draw_text: { color: #eceff4 }
+                draw_text: { color: (NORD_SNOW_2) }
             }
         }
     }
