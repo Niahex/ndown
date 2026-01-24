@@ -199,18 +199,24 @@ impl Document {
                     has_closing = true;
                 }
 
-                if has_closing {
-                    push_segment(pending_len, is_bold, is_italic, is_code);
-                    pending_len = 0;
-                    is_bold = !is_bold;
-                    i += 2;
-                    changed = true;
-                    continue;
-                }
-            }
-
-            if !is_code && chars[i] == '*' {
-                let mut has_closing = false;
+                                if has_closing {
+                                    push_segment(pending_len, is_bold, is_italic, is_code);
+                                    pending_len = 0;
+                                    is_bold = !is_bold;
+                                    i += 2;
+                                    changed = true;
+                                    continue;
+                                } else {
+                                    // Not a valid bold pair, treat as literal ** to prevent Italic check from matching
+                                    new_text.push('*');
+                                    new_text.push('*');
+                                    pending_len += 2;
+                                    i += 2;
+                                    continue;
+                                }
+                            }
+                            
+                            if !is_code && chars[i] == '*' {                let mut has_closing = false;
                 if !is_italic {
                     let mut k = i + 1;
                     while k < len {
