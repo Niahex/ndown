@@ -6,6 +6,8 @@ pub enum BlockType {
     Heading1,
     Heading2,
     Heading3,
+    Heading4,
+    Heading5,
     Quote,
     CodeBlock,
 }

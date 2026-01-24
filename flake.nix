@@ -72,6 +72,9 @@
           freetype
           alsa-lib
           libpulseaudio
+          nerd-fonts.ubuntu
+          nerd-fonts.ubuntu-mono
+          nerd-fonts.ubuntu-sans
         ];
 
         # Dependencies needed only at runtime
@@ -169,10 +172,10 @@
 
           shellHook = ''
             echo "[🦀 Rust $(rustc --version)] - Ready to develop ndown!"
-            
+
             # Auto-detect available Vulkan ICDs
             export VK_ICD_FILENAMES=$(find /run/opengl-driver/share/vulkan/icd.d -name "*_icd.*.json" 2>/dev/null | tr '\n' ':' | sed 's/:$//')
-            
+
             # GPU-specific optimizations
             if lspci 2>/dev/null | grep -qi nvidia; then
               export __GL_THREADED_OPTIMIZATIONS=1
@@ -187,7 +190,7 @@
             else
               echo "GPU: Auto-detected (AMD/NVIDIA/Intel)"
             fi
-            
+
             echo "Vulkan ICD: $VK_ICD_FILENAMES"
             echo "Available Vulkan devices:"
             vulkaninfo --summary 2>/dev/null | grep -A 2 "GPU" || echo "  Run 'vulkaninfo' for details"

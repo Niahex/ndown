@@ -10,6 +10,9 @@ pub struct EditorView<'a> {
     pub draw_text_code: &'a mut DrawText,
     pub draw_text_header1: &'a mut DrawText,
     pub draw_text_header2: &'a mut DrawText,
+    pub draw_text_header3: &'a mut DrawText,
+    pub draw_text_header4: &'a mut DrawText,
+    pub draw_text_header5: &'a mut DrawText,
     pub draw_text_quote: &'a mut DrawText,
     pub draw_cursor: &'a mut DrawColor,
     pub draw_selection: &'a mut DrawColor,
@@ -73,10 +76,13 @@ impl<'a> EditorView<'a> {
 
             let block = &mut params.doc.blocks[block_idx];
             let base_height_fallback = match block.ty {
-                BlockType::Heading1 => 28.0,
-                BlockType::Heading2 => 22.0,
-                BlockType::Quote => 20.0,
-                _ => 18.0,
+                BlockType::Heading1 => 33.9,
+                BlockType::Heading2 => 26.6,
+                BlockType::Heading3 => 21.8,
+                BlockType::Heading4 => 19.4,
+                BlockType::Heading5 => 16.9,
+                BlockType::Quote => 24.2,
+                _ => 21.8,
             };
 
             let is_below_screen =
@@ -113,6 +119,9 @@ impl<'a> EditorView<'a> {
                 let base_draw = match block.ty {
                     BlockType::Heading1 => self.draw_text_header1 as &mut DrawText,
                     BlockType::Heading2 => self.draw_text_header2 as &mut DrawText,
+                    BlockType::Heading3 => self.draw_text_header3 as &mut DrawText,
+                    BlockType::Heading4 => self.draw_text_header4 as &mut DrawText,
+                    BlockType::Heading5 => self.draw_text_header5 as &mut DrawText,
                     BlockType::Quote => self.draw_text_quote as &mut DrawText,
                     BlockType::CodeBlock => self.draw_text_code as &mut DrawText,
                     _ => self.draw_text_reg as &mut DrawText,
@@ -128,11 +137,17 @@ impl<'a> EditorView<'a> {
                 };
 
                 if block.ty == BlockType::Heading1 {
-                    draw_text.text_style.font_size = 24.0;
+                    draw_text.text_style.font_size = 29.0;
                 } else if block.ty == BlockType::Heading2 {
-                    draw_text.text_style.font_size = 18.0;
+                    draw_text.text_style.font_size = 21.8;
+                } else if block.ty == BlockType::Heading3 {
+                    draw_text.text_style.font_size = 19.4;
+                } else if block.ty == BlockType::Heading4 {
+                    draw_text.text_style.font_size = 16.9;
+                } else if block.ty == BlockType::Heading5 {
+                    draw_text.text_style.font_size = 14.5;
                 } else {
-                    draw_text.text_style.font_size = 10.0;
+                    draw_text.text_style.font_size = 12.1;
                 }
 
                 let mut span_text = String::with_capacity(span.len * 4);

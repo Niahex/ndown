@@ -60,6 +60,8 @@ impl Document {
                 BlockType::Heading1 => "# ",
                 BlockType::Heading2 => "## ",
                 BlockType::Heading3 => "### ",
+                BlockType::Heading4 => "#### ",
+                BlockType::Heading5 => "##### ",
                 BlockType::Quote => "> ",
                 _ => "",
             };
@@ -96,6 +98,27 @@ impl Document {
                     first.len = first.len.saturating_sub(3);
                 }
                 Some(3)
+            } else if block.text.starts_with("### ") {
+                block.ty = BlockType::Heading3;
+                block.text.replace_range(0..4, "");
+                if let Some(first) = block.styles.first_mut() {
+                    first.len = first.len.saturating_sub(4);
+                }
+                Some(4)
+            } else if block.text.starts_with("#### ") {
+                block.ty = BlockType::Heading4;
+                block.text.replace_range(0..5, "");
+                if let Some(first) = block.styles.first_mut() {
+                    first.len = first.len.saturating_sub(5);
+                }
+                Some(5)
+            } else if block.text.starts_with("##### ") {
+                block.ty = BlockType::Heading5;
+                block.text.replace_range(0..6, "");
+                if let Some(first) = block.styles.first_mut() {
+                    first.len = first.len.saturating_sub(6);
+                }
+                Some(6)
             } else if block.text.starts_with("> ") {
                 block.ty = BlockType::Quote;
                 block.text.replace_range(0..2, "");

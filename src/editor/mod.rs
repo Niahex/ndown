@@ -35,14 +35,17 @@ live_design! {
 
         scroll_bars: <ScrollBars> {}
 
-        draw_text_reg: { text_style: <THEME_FONT_REGULAR> { font_size: 10.0 }, color: #eceff4 }
-        draw_text_bold: { text_style: <THEME_FONT_BOLD> { font_size: 10.0 }, color: #eceff4 }
-        draw_text_italic: { text_style: <THEME_FONT_ITALIC> { font_size: 10.0 }, color: #eceff4 }
-        draw_text_code: { text_style: <THEME_FONT_CODE> { font_size: 10.0 }, color: #a3be8c }
+        draw_text_reg: { text_style: <THEME_FONT_REGULAR> { font_size: 12.1 }, color: #eceff4 }
+        draw_text_bold: { text_style: <THEME_FONT_BOLD> { font_size: 12.1 }, color: #eceff4 }
+        draw_text_italic: { text_style: <THEME_FONT_ITALIC> { font_size: 12.1 }, color: #eceff4 }
+        draw_text_code: { text_style: <THEME_FONT_CODE> { font_size: 12.1 }, color: #a3be8c }
 
-        draw_text_header1: { text_style: <THEME_FONT_BOLD> { font_size: 24.0 }, color: #88c0d0 }
-        draw_text_header2: { text_style: <THEME_FONT_BOLD> { font_size: 18.0 }, color: #81a1c1 }
-        draw_text_quote: { text_style: <THEME_FONT_ITALIC> { font_size: 11.0 }, color: #d08770 }
+        draw_text_header1: { text_style: <THEME_FONT_BOLD> { font_size: 29.0 }, color: #88c0d0 }
+        draw_text_header2: { text_style: <THEME_FONT_BOLD> { font_size: 21.8 }, color: #81a1c1 }
+        draw_text_header3: { text_style: <THEME_FONT_BOLD> { font_size: 19.4 }, color: #81a1c1 }
+        draw_text_header4: { text_style: <THEME_FONT_BOLD> { font_size: 16.9 }, color: #81a1c1 }
+        draw_text_header5: { text_style: <THEME_FONT_BOLD> { font_size: 14.5 }, color: #81a1c1 }
+        draw_text_quote: { text_style: <THEME_FONT_ITALIC> { font_size: 13.3 }, color: #d08770 }
 
         draw_cursor: { color: #ffffff }
         draw_selection: { color: #4c566a }
@@ -77,6 +80,12 @@ pub struct EditorArea {
     draw_text_header1: DrawText,
     #[live]
     draw_text_header2: DrawText,
+    #[live]
+    draw_text_header3: DrawText,
+    #[live]
+    draw_text_header4: DrawText,
+    #[live]
+    draw_text_header5: DrawText,
     #[live]
     draw_text_quote: DrawText,
 
@@ -189,11 +198,17 @@ impl EditorArea {
              for line in content.lines() {
                  let ty = if line.starts_with("# ") { BlockType::Heading1 }
                  else if line.starts_with("## ") { BlockType::Heading2 }
+                 else if line.starts_with("### ") { BlockType::Heading3 }
+                 else if line.starts_with("#### ") { BlockType::Heading4 }
+                 else if line.starts_with("##### ") { BlockType::Heading5 }
                  else if line.starts_with("> ") { BlockType::Quote }
                  else { BlockType::Paragraph };
                  
                  let text = if matches!(ty, BlockType::Heading1) { &line[2..] }
                  else if matches!(ty, BlockType::Heading2) { &line[3..] }
+                 else if matches!(ty, BlockType::Heading3) { &line[4..] }
+                 else if matches!(ty, BlockType::Heading4) { &line[5..] }
+                 else if matches!(ty, BlockType::Heading5) { &line[6..] }
                  else if matches!(ty, BlockType::Quote) { &line[2..] }
                  else { line };
                  
@@ -533,6 +548,9 @@ impl Widget for EditorArea {
             draw_text_code: &mut self.draw_text_code,
             draw_text_header1: &mut self.draw_text_header1,
             draw_text_header2: &mut self.draw_text_header2,
+            draw_text_header3: &mut self.draw_text_header3,
+            draw_text_header4: &mut self.draw_text_header4,
+            draw_text_header5: &mut self.draw_text_header5,
             draw_text_quote: &mut self.draw_text_quote,
             draw_cursor: &mut self.draw_cursor,
             draw_selection: &mut self.draw_selection,
