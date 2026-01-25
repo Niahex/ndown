@@ -176,6 +176,7 @@ impl<'a> EditorView<'a> {
             let mut cursor_x_final = current_x;
 
             let mut char_iter = block.text.chars();
+            let mut current_byte_offset = 0;
 
             for span in &block.styles {
                 let base_draw = match block.ty {
@@ -212,15 +213,24 @@ impl<'a> EditorView<'a> {
                     draw_text.text_style.font_size = 12.1;
                 }
 
-                let mut span_text = String::with_capacity(span.len * 4);
+                // Optimization: Zero-copy slicing
+                let mut span_byte_len = 0;
                 for _ in 0..span.len {
                     if let Some(c) = char_iter.next() {
-                        span_text.push(c);
+                        span_byte_len += c.len_utf8();
                     }
                 }
+                let span_end_byte = current_byte_offset + span_byte_len;
+                // Ensure we don't panic if indices are out of bounds (though they shouldn't be)
+                let span_text = if span_end_byte <= block.text.len() {
+                    &block.text[current_byte_offset..span_end_byte]
+                } else {
+                    ""
+                };
+                current_byte_offset = span_end_byte;
 
                 let text_layout =
-                    draw_text.layout(cx, 0.0, 0.0, None, false, Align::default(), &span_text);
+                    draw_text.layout(cx, 0.0, 0.0, None, false, Align::default(), span_text);
                 let width = text_layout.size_in_lpxs.width as f64;
                 let height = text_layout.size_in_lpxs.height as f64;
 
@@ -261,7 +271,20 @@ impl<'a> EditorView<'a> {
                             if intersect_start < intersect_end {
                                 let rel_start = intersect_start - span_start;
                                 let rel_end = intersect_end - span_start;
-                                let s_before: String = span_text.chars().take(rel_start).collect();
+
+                                // Optimization: Slice instead of collect
+                                let mut byte_start_sel = 0;
+                                let mut byte_len_sel = 0;
+                                for (i, c) in span_text.chars().enumerate() {
+                                    if i < rel_start {
+                                        byte_start_sel += c.len_utf8();
+                                    } else if i < rel_end {
+                                        byte_len_sel += c.len_utf8();
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                let s_before = &span_text[0..byte_start_sel];
                                 let w_before = if rel_start > 0 {
                                     draw_text
                                         .layout(
@@ -271,20 +294,18 @@ impl<'a> EditorView<'a> {
                                             None,
                                             false,
                                             Align::default(),
-                                            &s_before,
+                                            s_before,
                                         )
                                         .size_in_lpxs
                                         .width as f64
                                 } else {
                                     0.0
                                 };
-                                let s_sel: String = span_text
-                                    .chars()
-                                    .skip(rel_start)
-                                    .take(rel_end - rel_start)
-                                    .collect();
+
+                                let s_sel = &span_text
+                                    [byte_start_sel..byte_start_sel + byte_len_sel];
                                 let w_sel = draw_text
-                                    .layout(cx, 0.0, 0.0, None, false, Align::default(), &s_sel)
+                                    .layout(cx, 0.0, 0.0, None, false, Align::default(), s_sel)
                                     .size_in_lpxs
                                     .width as f64;
                                 self.draw_selection.draw_abs(
@@ -315,7 +336,7 @@ impl<'a> EditorView<'a> {
                         }
                     }
 
-                    draw_text.draw_abs(cx, dvec2(current_x, current_y), &span_text);
+                    draw_text.draw_abs(cx, dvec2(current_x, current_y), span_text);
 
                     if block_idx == params.cursor.0
                         && !found_cursor
@@ -328,7 +349,16 @@ impl<'a> EditorView<'a> {
                         } else if local_idx == span.len {
                             cursor_x_final = current_x + width;
                         } else {
-                            let sub_text: String = span_text.chars().take(local_idx).collect();
+                            // Optimization: Slice
+                            let mut byte_len_sub = 0;
+                            for (i, c) in span_text.chars().enumerate() {
+                                if i < local_idx {
+                                    byte_len_sub += c.len_utf8();
+                                } else {
+                                    break;
+                                }
+                            }
+                            let sub_text = &span_text[0..byte_len_sub];
                             let sub_layout = draw_text.layout(
                                 cx,
                                 0.0,
@@ -336,7 +366,7 @@ impl<'a> EditorView<'a> {
                                 None,
                                 false,
                                 Align::default(),
-                                &sub_text,
+                                sub_text,
                             );
                             cursor_x_final = current_x + sub_layout.size_in_lpxs.width as f64;
                         }

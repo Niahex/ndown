@@ -479,6 +479,10 @@ Fonction centrale de rendu avec optimisations avancées.
 
 ---
 
+## Optimisations Réalisées
+
+- ✅ **Rendu Zero-Copy**: Suppression des allocations `String` par span dans `EditorView::draw_document`. Utilisation de slices sur le texte du bloc pour le rendu, la sélection et le calcul du curseur.
+
 ## Points d'Amélioration Identifiés
 
 ### File Explorer
