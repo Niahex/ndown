@@ -130,6 +130,8 @@
 - **Ctrl+S**: Sauvegarde asynchrone
 
 #### Formatage Automatique
+- **Ctrl+B**: Gras (wrap sélection ou insertion curseur)
+- **Ctrl+I**: Italique (wrap sélection ou insertion curseur)
 - Typing `# ` → Heading1
 - Typing `## ` → Heading2
 - Typing `### ` → Heading3
