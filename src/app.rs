@@ -143,7 +143,7 @@ impl MatchEvent for App {
         // Note: EditorArea n'émet pas encore d'actions WidgetAction formelles dans le code actuel,
         // mais si on voulait écouter des événements:
         for action in actions {
-            if let Some(EditorAction::FileLoaded) = action.as_widget_action().cast() {
+            if let Some(EditorAction::FileLoaded(_)) = action.as_widget_action().cast() {
                 makepad_widgets::log!("File loaded successfully.");
             }
         }

@@ -487,6 +487,9 @@ Fonction centrale de rendu avec optimisations avancées.
 - ✅ **List Counters Optimisés**: Calcul des numéros de liste (1., 2., 3.) en O(TailleListe) au lieu de O(ScrollPosition), rendant le défilement fluide même en fin de gros documents.
 - ✅ **Formatage Incremental**: `apply_inline_formatting` évite la reconstruction coûteuse du markdown pour les paragraphes de texte brut.
 - ✅ **Hit Testing Optimisé**: Arrêt des tests de collision dès qu'une touche est détectée dans `draw_document`.
+- ✅ **Chargement Bufferisé**: `load_file` utilise `BufReader` pour éviter l'allocation d'une chaîne géante lors de l'ouverture de gros fichiers.
+- ✅ **Cache Layout Partiel**: `invalidate_layout_from` et `draw_document` permettent de ne recalculer la mise en page (hauteur des blocs) qu'à partir du bloc modifié, au lieu de tout le document.
+- ✅ **Architecture Async (Tokio)**: Chargement des fichiers, lecture des répertoires et sauvegarde asynchrones via un runtime Tokio global, garantissant une UI fluide sans freeze I/O.
 
 ## Points d'Amélioration Identifiés
 
