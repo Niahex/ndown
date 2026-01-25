@@ -69,16 +69,20 @@ impl<'a> EditorView<'a> {
         };
 
         let mut list_counters: Vec<u32> = vec![0; 10];
-        
+
         for i in 0..start_block_idx {
             let block = &params.doc.blocks[i];
             if block.ty != BlockType::OrderedListItem && block.ty != BlockType::ListItem {
-                 list_counters.fill(0);
+                list_counters.fill(0);
             } else if block.ty == BlockType::OrderedListItem {
-                 let level = block.indent as usize;
-                 if level >= list_counters.len() { list_counters.resize(level + 1, 0); }
-                 list_counters[level] += 1;
-                 for k in level+1..list_counters.len() { list_counters[k] = 0; }
+                let level = block.indent as usize;
+                if level >= list_counters.len() {
+                    list_counters.resize(level + 1, 0);
+                }
+                list_counters[level] += 1;
+                for counter in list_counters.iter_mut().skip(level + 1) {
+                    *counter = 0;
+                }
             }
         }
 
@@ -127,31 +131,43 @@ impl<'a> EditorView<'a> {
             let mut current_x = start_x;
 
             if block.ty != BlockType::OrderedListItem && block.ty != BlockType::ListItem {
-                 list_counters.fill(0);
+                list_counters.fill(0);
             }
 
             if block.ty == BlockType::ListItem {
-                 current_x += (block.indent as f64) * 20.0;
-                 if current_y >= params.rect.pos.y && current_y < params.rect.pos.y + params.rect.size.y {
-                     self.draw_text_reg.draw_abs(cx, dvec2(current_x, current_y), "• ");
-                 }
-                 current_x += 15.0; 
+                current_x += (block.indent as f64) * 20.0;
+                if current_y >= params.rect.pos.y
+                    && current_y < params.rect.pos.y + params.rect.size.y
+                {
+                    self.draw_text_reg
+                        .draw_abs(cx, dvec2(current_x, current_y), "• ");
+                }
+                current_x += 15.0;
             } else if block.ty == BlockType::OrderedListItem {
-                 let level = block.indent as usize;
-                 if level >= list_counters.len() { list_counters.resize(level + 1, 0); }
-                 list_counters[level] += 1;
-                 for i in level+1..list_counters.len() { list_counters[i] = 0; }
+                let level = block.indent as usize;
+                if level >= list_counters.len() {
+                    list_counters.resize(level + 1, 0);
+                }
+                list_counters[level] += 1;
+                for counter in list_counters.iter_mut().skip(level + 1) {
+                    *counter = 0;
+                }
 
-                 current_x += (block.indent as f64) * 20.0;
-                 
-                 let prefix = format!("{}. ", list_counters[level]);
-                 let prefix_layout = self.draw_text_reg.layout(cx, 0.0, 0.0, None, false, Align::default(), &prefix);
-                 let prefix_width = prefix_layout.size_in_lpxs.width as f64;
+                current_x += (block.indent as f64) * 20.0;
 
-                 if current_y >= params.rect.pos.y && current_y < params.rect.pos.y + params.rect.size.y {
-                     self.draw_text_reg.draw_abs(cx, dvec2(current_x, current_y), &prefix);
-                 }
-                 current_x += prefix_width + 5.0; 
+                let prefix = format!("{}. ", list_counters[level]);
+                let prefix_layout =
+                    self.draw_text_reg
+                        .layout(cx, 0.0, 0.0, None, false, Align::default(), &prefix);
+                let prefix_width = prefix_layout.size_in_lpxs.width as f64;
+
+                if current_y >= params.rect.pos.y
+                    && current_y < params.rect.pos.y + params.rect.size.y
+                {
+                    self.draw_text_reg
+                        .draw_abs(cx, dvec2(current_x, current_y), &prefix);
+                }
+                current_x += prefix_width + 5.0;
             }
 
             let mut max_h_calc = 0.0;
@@ -215,7 +231,7 @@ impl<'a> EditorView<'a> {
 
                 if should_draw {
                     if span.style.is_code {
-                         self.draw_code_bg.draw_abs(
+                        self.draw_code_bg.draw_abs(
                             cx,
                             Rect {
                                 pos: dvec2(current_x, current_y),

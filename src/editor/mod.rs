@@ -34,13 +34,13 @@ live_design! {
             latin = font("crate://self/assets/fonts/UbuntuNerdFont-Regular.ttf", 0.0, 0.0),
         }
     }
-    
+
     pub THEME_FONT_BOLD = {
         font_family: {
             latin = font("crate://self/assets/fonts/UbuntuNerdFont-Bold.ttf", 0.0, 0.0),
         }
     }
-    
+
     pub THEME_FONT_ITALIC = {
         font_family: {
             latin = font("crate://self/assets/fonts/UbuntuNerdFont-Italic.ttf", 0.0, 0.0),
@@ -224,39 +224,55 @@ impl EditorArea {
     // CHARGEMENT SYNCHRONE (Temporaire pour valider)
     pub fn load_file(&mut self, _cx: &mut Cx, filename: String) {
         if let Ok(content) = std::fs::read_to_string(&filename) {
-             let mut new_blocks = Vec::new();
-             let mut id_gen = 1000;
-             for line in content.lines() {
-                 let ty = if line.starts_with("# ") { BlockType::Heading1 }
-                 else if line.starts_with("## ") { BlockType::Heading2 }
-                 else if line.starts_with("### ") { BlockType::Heading3 }
-                 else if line.starts_with("#### ") { BlockType::Heading4 }
-                 else if line.starts_with("##### ") { BlockType::Heading5 }
-                 else if line.starts_with("> ") { BlockType::Quote }
-                 else { BlockType::Paragraph };
-                 
-                 let text = if matches!(ty, BlockType::Heading1) { &line[2..] }
-                 else if matches!(ty, BlockType::Heading2) { &line[3..] }
-                 else if matches!(ty, BlockType::Heading3) { &line[4..] }
-                 else if matches!(ty, BlockType::Heading4) { &line[5..] }
-                 else if matches!(ty, BlockType::Heading5) { &line[6..] }
-                 else if matches!(ty, BlockType::Quote) { &line[2..] }
-                 else { line };
-                 
-                 let block = Block::new(id_gen, ty, text);
-                 id_gen += 1;
-                 new_blocks.push(block);
-             }
-             
-             if new_blocks.is_empty() {
-                 new_blocks.push(Block::new(id_gen, BlockType::Paragraph, ""));
-             }
-             
-             self.document.blocks = new_blocks;
-             self.cursor_block = 0;
-             self.cursor_char = 0;
-             self.invalidate_layout();
-             self.redraw(_cx);
+            let mut new_blocks = Vec::new();
+            let mut id_gen = 1000;
+            for line in content.lines() {
+                let ty = if line.starts_with("# ") {
+                    BlockType::Heading1
+                } else if line.starts_with("## ") {
+                    BlockType::Heading2
+                } else if line.starts_with("### ") {
+                    BlockType::Heading3
+                } else if line.starts_with("#### ") {
+                    BlockType::Heading4
+                } else if line.starts_with("##### ") {
+                    BlockType::Heading5
+                } else if line.starts_with("> ") {
+                    BlockType::Quote
+                } else {
+                    BlockType::Paragraph
+                };
+
+                let text = if matches!(ty, BlockType::Heading1) {
+                    &line[2..]
+                } else if matches!(ty, BlockType::Heading2) {
+                    &line[3..]
+                } else if matches!(ty, BlockType::Heading3) {
+                    &line[4..]
+                } else if matches!(ty, BlockType::Heading4) {
+                    &line[5..]
+                } else if matches!(ty, BlockType::Heading5) {
+                    &line[6..]
+                } else if matches!(ty, BlockType::Quote) {
+                    &line[2..]
+                } else {
+                    line
+                };
+
+                let block = Block::new(id_gen, ty, text);
+                id_gen += 1;
+                new_blocks.push(block);
+            }
+
+            if new_blocks.is_empty() {
+                new_blocks.push(Block::new(id_gen, BlockType::Paragraph, ""));
+            }
+
+            self.document.blocks = new_blocks;
+            self.cursor_block = 0;
+            self.cursor_char = 0;
+            self.invalidate_layout();
+            self.redraw(_cx);
         }
     }
 
@@ -391,45 +407,58 @@ impl Widget for EditorArea {
 
                     if let Some(text) = text_opt {
                         if !text.is_empty() {
-                             if let Some((start, end)) = self.get_selection_range() {
+                            if let Some((start, end)) = self.get_selection_range() {
                                 self.document.delete_range(start, end);
                                 self.cursor_block = start.0;
                                 self.cursor_char = start.1;
                                 self.selection_anchor = None;
                             }
-                            
+
                             // Remove carriage returns
                             let text = text.replace("\r\n", "\n").replace('\r', "\n");
-                            
+
                             let mut parts = text.split('\n');
                             if let Some(first) = parts.next() {
-                                let added = self.document.insert_text_at(self.cursor_block, self.cursor_char, first);
+                                let added = self.document.insert_text_at(
+                                    self.cursor_block,
+                                    self.cursor_char,
+                                    first,
+                                );
                                 self.cursor_char += added;
                             }
-                            
+
                             for part in parts {
                                 // Split block at cursor
                                 let current_block = &mut self.document.blocks[self.cursor_block];
-                                let rest_text: String = current_block.text.chars().skip(self.cursor_char).collect();
+                                let rest_text: String =
+                                    current_block.text.chars().skip(self.cursor_char).collect();
                                 let rest_len = rest_text.chars().count();
-                                
+
                                 // Truncate current block
                                 let current_len = current_block.text_len();
                                 for _ in 0..rest_len {
-                                    self.document.remove_char_at(self.cursor_block, current_len - rest_len);
+                                    self.document
+                                        .remove_char_at(self.cursor_block, current_len - rest_len);
                                 }
-                                
+
                                 // Create new block with rest
-                                let mut new_block = Block::new(self.document.generate_id(), BlockType::Paragraph, &rest_text);
-                                
-                                self.document.blocks.insert(self.cursor_block + 1, new_block);
+                                let new_block = Block::new(
+                                    self.document.generate_id(),
+                                    BlockType::Paragraph,
+                                    &rest_text,
+                                );
+
+                                self.document
+                                    .blocks
+                                    .insert(self.cursor_block + 1, new_block);
                                 self.cursor_block += 1;
                                 self.cursor_char = 0;
-                                
-                                let added = self.document.insert_text_at(self.cursor_block, 0, part);
+
+                                let added =
+                                    self.document.insert_text_at(self.cursor_block, 0, part);
                                 self.cursor_char += added;
                             }
-                            
+
                             self.invalidate_layout();
                             self.redraw(cx);
                         }
@@ -438,18 +467,33 @@ impl Widget for EditorArea {
                 }
 
                 if ctrl && (ke.key_code == KeyCode::KeyB || ke.key_code == KeyCode::KeyI) {
-                    if let Some(((start_blk, start_char), (end_blk, end_char))) = self.get_selection_range() {
+                    if let Some(((start_blk, start_char), (end_blk, end_char))) =
+                        self.get_selection_range()
+                    {
                         if start_blk == end_blk {
                             let style_type = if ke.key_code == KeyCode::KeyB { 0 } else { 1 };
-                            self.document.toggle_formatting(start_blk, start_char, end_char, style_type);
+                            self.document
+                                .toggle_formatting(start_blk, start_char, end_char, style_type);
                             // La longueur du texte ne change pas avec toggle_formatting (juste les styles)
                             // Donc pas besoin de toucher au curseur
                             // On garde la selection pour pouvoir re-toggeler si besoin
                         }
                     } else {
-                        let marker = if ke.key_code == KeyCode::KeyB { "**" } else { "*" };
-                        let insert_text = if ke.key_code == KeyCode::KeyB { "****" } else { "**" };
-                        self.document.insert_text_at(self.cursor_block, self.cursor_char, insert_text);
+                        let marker = if ke.key_code == KeyCode::KeyB {
+                            "**"
+                        } else {
+                            "*"
+                        };
+                        let insert_text = if ke.key_code == KeyCode::KeyB {
+                            "****"
+                        } else {
+                            "**"
+                        };
+                        self.document.insert_text_at(
+                            self.cursor_block,
+                            self.cursor_char,
+                            insert_text,
+                        );
                         self.cursor_char += marker.len();
                     }
                     self.redraw(cx);
@@ -474,17 +518,17 @@ impl Widget for EditorArea {
 
                 if ke.key_code == KeyCode::Tab {
                     let current_ty = self.document.blocks[self.cursor_block].ty.clone();
-                    if current_ty == BlockType::ListItem || current_ty == BlockType::OrderedListItem {
+                    if current_ty == BlockType::ListItem || current_ty == BlockType::OrderedListItem
+                    {
                         if shift {
                             if self.document.blocks[self.cursor_block].indent > 0 {
                                 self.document.blocks[self.cursor_block].indent -= 1;
                                 self.invalidate_layout();
                             }
-                        } else {
-                            if self.document.blocks[self.cursor_block].indent < 10 { // Max indentation
-                                self.document.blocks[self.cursor_block].indent += 1;
-                                self.invalidate_layout();
-                            }
+                        } else if self.document.blocks[self.cursor_block].indent < 10 {
+                            // Max indentation
+                            self.document.blocks[self.cursor_block].indent += 1;
+                            self.invalidate_layout();
                         }
                     }
                     self.redraw(cx);
@@ -531,9 +575,12 @@ impl Widget for EditorArea {
                         self.selection_anchor = None;
                         let current_ty = self.document.blocks[self.cursor_block].ty.clone();
                         let current_len = self.document.blocks[self.cursor_block].text_len();
-                        
+
                         // Exit list if empty item
-                        if (current_ty == BlockType::ListItem || current_ty == BlockType::OrderedListItem) && current_len == 0 {
+                        if (current_ty == BlockType::ListItem
+                            || current_ty == BlockType::OrderedListItem)
+                            && current_len == 0
+                        {
                             if self.document.blocks[self.cursor_block].indent > 0 {
                                 self.document.blocks[self.cursor_block].indent -= 1;
                             } else {
@@ -545,16 +592,22 @@ impl Widget for EditorArea {
                         }
 
                         let (new_ty, new_indent) = if current_ty == BlockType::ListItem {
-                            (BlockType::ListItem, self.document.blocks[self.cursor_block].indent)
+                            (
+                                BlockType::ListItem,
+                                self.document.blocks[self.cursor_block].indent,
+                            )
                         } else if current_ty == BlockType::OrderedListItem {
-                            (BlockType::OrderedListItem, self.document.blocks[self.cursor_block].indent)
+                            (
+                                BlockType::OrderedListItem,
+                                self.document.blocks[self.cursor_block].indent,
+                            )
                         } else {
                             (BlockType::Paragraph, 0)
                         };
-                        
+
                         let mut new_block = Block::new(self.document.generate_id(), new_ty, "");
                         new_block.indent = new_indent;
-                        
+
                         self.document
                             .blocks
                             .insert(self.cursor_block + 1, new_block);
@@ -677,10 +730,10 @@ impl Widget for EditorArea {
                 self.redraw(cx);
             }
             Hit::TextInput(te) => {
-                let is_valid_input = !te.input.chars().any(|c| c.is_control()) 
-                                     || te.input.contains('\n') 
-                                     || te.input.contains('\r')
-                                     || te.input.contains('\t');
+                let is_valid_input = !te.input.chars().any(|c| c.is_control())
+                    || te.input.contains('\n')
+                    || te.input.contains('\r')
+                    || te.input.contains('\t');
 
                 if !te.input.is_empty() && is_valid_input {
                     let mut wrapped = false;
@@ -692,7 +745,8 @@ impl Widget for EditorArea {
                             && start_char != end_char
                             && (te.input == "*" || te.input == "`" || te.input == "_")
                         {
-                            let consumed = self.document
+                            let consumed = self
+                                .document
                                 .wrap_selection(start_blk, start_char, end_char, &te.input);
                             if !consumed {
                                 self.selection_anchor = Some((start_blk, start_char + 1));

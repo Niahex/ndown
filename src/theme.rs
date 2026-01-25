@@ -28,8 +28,8 @@ live_design! {
 
     // User Specified Custom Colors
     // Mute: Polar1 at 40% opacity (0.4 * 255 = ~102 = 0x66)
-    pub COLOR_MUTE = #3B425266 
-    
+    pub COLOR_MUTE = #3B425266
+
     // Accent: Frost1 (using standard Nord8 #88C0D0 as primary frost/cyan) at 25% opacity (0.25 * 255 = ~64 = 0x40)
     // Note: If Frost1 refers to the very first item (Nord7 #8FBCBB), use that. Standard Nord "Frost" is usually 88C0D0.
     // I will use #88C0D0 (Nord8) as it is the most common "Nord Accent".
@@ -38,9 +38,9 @@ live_design! {
     // Theme Overrides
     pub THEME_COLOR_BG_APP = (NORD_POLAR_0)
     pub THEME_COLOR_BG_CONTAINER = (NORD_POLAR_1)
-    
+
     pub THEME_COLOR_TEXT_DEFAULT = (NORD_SNOW_2)
     pub THEME_COLOR_TEXT_MUTE = (NORD_SNOW_0)
-    
+
     pub THEME_COLOR_ACCENT = (NORD_FROST_1)
 }

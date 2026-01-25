@@ -16,7 +16,7 @@ live_design! {
             header = <View> {
                 width: Fill, height: Fit
                 flow: Right, spacing: 10, align: {y: 0.5}, margin: {bottom: 10}
-                
+
                 toggle_btn = <Button> {
                     width: 30, height: 30
                     text: "☰"

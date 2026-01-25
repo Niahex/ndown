@@ -72,19 +72,21 @@ impl Document {
                 BlockType::Quote => "> ".to_string(),
                 BlockType::ListItem => "- ".to_string(),
                 BlockType::OrderedListItem => {
-                    let p = format!("{}. ", ordered_list_counter);
+                    let p = format!("{ordered_list_counter}. ");
                     ordered_list_counter += 1;
                     p
                 }
                 _ => "".to_string(),
             };
 
-            if (block.ty == BlockType::ListItem || block.ty == BlockType::OrderedListItem) && block.indent > 0 {
+            if (block.ty == BlockType::ListItem || block.ty == BlockType::OrderedListItem)
+                && block.indent > 0
+            {
                 for _ in 0..block.indent {
                     writer.write_all(b"  ")?;
                 }
             }
-            
+
             writer.write_all(prefix.as_bytes())?;
 
             block.write_markdown_to_writer(&mut writer)?;
@@ -153,8 +155,12 @@ impl Document {
                 while space_count < chars.len() && chars[space_count] == ' ' {
                     space_count += 1;
                 }
-                
-                if space_count < chars.len() && chars[space_count] == '-' && space_count + 1 < chars.len() && chars[space_count+1] == ' ' {
+
+                if space_count < chars.len()
+                    && chars[space_count] == '-'
+                    && space_count + 1 < chars.len()
+                    && chars[space_count + 1] == ' '
+                {
                     block.ty = BlockType::ListItem;
                     block.indent = (space_count / 2) as u8; // Assuming 2 spaces per indent
                     let remove_count = space_count + 2; // spaces + "- "
@@ -164,17 +170,22 @@ impl Document {
                     }
                     Some(remove_count)
                 } else {
-                     // Check for Ordered List Item (1. )
+                    // Check for Ordered List Item (1. )
                     let mut digit_end = space_count;
                     while digit_end < chars.len() && chars[digit_end].is_ascii_digit() {
                         digit_end += 1;
                     }
-                    if digit_end > space_count && digit_end < chars.len() && chars[digit_end] == '.' && digit_end + 1 < chars.len() && chars[digit_end+1] == ' ' {
+                    if digit_end > space_count
+                        && digit_end < chars.len()
+                        && chars[digit_end] == '.'
+                        && digit_end + 1 < chars.len()
+                        && chars[digit_end + 1] == ' '
+                    {
                         block.ty = BlockType::OrderedListItem;
                         block.indent = (space_count / 2) as u8;
                         let remove_count = digit_end + 2; // spaces + digits + ". "
                         block.text.replace_range(0..remove_count, "");
-                         if let Some(first) = block.styles.first_mut() {
+                        if let Some(first) = block.styles.first_mut() {
                             first.len = first.len.saturating_sub(remove_count);
                         }
                         Some(remove_count)
@@ -276,24 +287,25 @@ impl Document {
                     has_closing = true;
                 }
 
-                                if has_closing {
-                                    push_segment(pending_len, is_bold, is_italic, is_code);
-                                    pending_len = 0;
-                                    is_bold = !is_bold;
-                                    i += 2;
-                                    changed = true;
-                                    continue;
-                                } else {
-                                    // Not a valid bold pair, treat as literal ** to prevent Italic check from matching
-                                    new_text.push('*');
-                                    new_text.push('*');
-                                    pending_len += 2;
-                                    i += 2;
-                                    continue;
-                                }
-                            }
-                            
-                            if !is_code && chars[i] == '*' {                let mut has_closing = false;
+                if has_closing {
+                    push_segment(pending_len, is_bold, is_italic, is_code);
+                    pending_len = 0;
+                    is_bold = !is_bold;
+                    i += 2;
+                    changed = true;
+                    continue;
+                } else {
+                    // Not a valid bold pair, treat as literal ** to prevent Italic check from matching
+                    new_text.push('*');
+                    new_text.push('*');
+                    pending_len += 2;
+                    i += 2;
+                    continue;
+                }
+            }
+
+            if !is_code && chars[i] == '*' {
+                let mut has_closing = false;
                 if !is_italic {
                     let mut k = i + 1;
                     while k < len {
@@ -426,17 +438,23 @@ impl Document {
         true
     }
 
-        pub fn wrap_selection(&mut self, block_idx: usize, start: usize, end: usize, marker: &str) -> bool {
-
-            if block_idx >= self.blocks.len() { return false; }
-
-            self.insert_text_at(block_idx, end, marker);
-
-            self.insert_text_at(block_idx, start, marker);
-
-            self.apply_inline_formatting(block_idx)
-
+    pub fn wrap_selection(
+        &mut self,
+        block_idx: usize,
+        start: usize,
+        end: usize,
+        marker: &str,
+    ) -> bool {
+        if block_idx >= self.blocks.len() {
+            return false;
         }
+
+        self.insert_text_at(block_idx, end, marker);
+
+        self.insert_text_at(block_idx, start, marker);
+
+        self.apply_inline_formatting(block_idx)
+    }
 
     pub fn merge_block_with_prev(&mut self, block_idx: usize) -> Option<usize> {
         if block_idx == 0 || block_idx >= self.blocks.len() {
@@ -486,14 +504,22 @@ impl Document {
         }
     }
 
-    pub fn toggle_formatting(&mut self, block_idx: usize, start: usize, end: usize, style_type: u8) {
-        if block_idx >= self.blocks.len() { return; }
-        
-        self.split_span_at(block_idx, end); 
+    pub fn toggle_formatting(
+        &mut self,
+        block_idx: usize,
+        start: usize,
+        end: usize,
+        style_type: u8,
+    ) {
+        if block_idx >= self.blocks.len() {
+            return;
+        }
+
+        self.split_span_at(block_idx, end);
         self.split_span_at(block_idx, start);
-        
+
         let block = &mut self.blocks[block_idx];
-        
+
         let mut all_match = true;
         let mut current_idx = 0;
         let mut start_idx = None;
@@ -502,11 +528,13 @@ impl Document {
         for (i, span) in block.styles.iter().enumerate() {
             let s_start = current_idx;
             let s_end = current_idx + span.len;
-            
+
             if s_end > start && s_start < end {
-                if start_idx.is_none() { start_idx = Some(i); }
+                if start_idx.is_none() {
+                    start_idx = Some(i);
+                }
                 end_idx = Some(i);
-                
+
                 let is_on = match style_type {
                     0 => span.style.is_bold,
                     1 => span.style.is_italic,
@@ -526,22 +554,25 @@ impl Document {
                 if turn_on {
                     // Exclusive mode: Disable others when enabling one
                     match style_type {
-                        0 => { // Bold
+                        0 => {
+                            // Bold
                             block.styles[i].style.is_bold = true;
                             block.styles[i].style.is_italic = false;
                             block.styles[i].style.is_code = false;
-                        },
-                        1 => { // Italic
+                        }
+                        1 => {
+                            // Italic
                             block.styles[i].style.is_bold = false;
                             block.styles[i].style.is_italic = true;
                             block.styles[i].style.is_code = false;
-                        },
-                        2 => { // Code
+                        }
+                        2 => {
+                            // Code
                             block.styles[i].style.is_bold = false;
                             block.styles[i].style.is_italic = false;
                             block.styles[i].style.is_code = true;
-                        },
-                        _ => {},
+                        }
+                        _ => {}
                     }
                 } else {
                     // Toggling off: Just disable the target style
@@ -549,29 +580,30 @@ impl Document {
                         0 => block.styles[i].style.is_bold = false,
                         1 => block.styles[i].style.is_italic = false,
                         2 => block.styles[i].style.is_code = false,
-                        _ => {},
+                        _ => {}
                     }
                 }
             }
         }
 
         block.mark_dirty();
-        
+
         let mut new_styles = Vec::new();
         if !block.styles.is_empty() {
-             let mut current = block.styles[0].clone();
-             for next in block.styles.iter().skip(1) {
-                 if current.style.is_bold == next.style.is_bold &&
-                    current.style.is_italic == next.style.is_italic &&
-                    current.style.is_code == next.style.is_code {
-                     current.len += next.len;
-                 } else {
-                     new_styles.push(current);
-                     current = next.clone();
-                 }
-             }
-             new_styles.push(current);
-             block.styles = new_styles;
+            let mut current = block.styles[0].clone();
+            for next in block.styles.iter().skip(1) {
+                if current.style.is_bold == next.style.is_bold
+                    && current.style.is_italic == next.style.is_italic
+                    && current.style.is_code == next.style.is_code
+                {
+                    current.len += next.len;
+                } else {
+                    new_styles.push(current);
+                    current = next.clone();
+                }
+            }
+            new_styles.push(current);
+            block.styles = new_styles;
         }
     }
 
@@ -596,7 +628,7 @@ impl Document {
             span1.len = split_len1;
             let mut span2 = original.clone();
             span2.len = original.len - split_len1;
-            
+
             block.styles[i] = span1;
             block.styles.insert(i + 1, span2);
         }
@@ -605,7 +637,7 @@ impl Document {
     pub fn get_text_in_range(&self, start: (usize, usize), end: (usize, usize)) -> String {
         let (start_blk, start_char) = start;
         let (end_blk, end_char) = end;
-        
+
         if start_blk == end_blk {
             let text = &self.blocks[start_blk].text;
             let chars: Vec<char> = text.chars().collect();
@@ -614,9 +646,9 @@ impl Document {
             }
             return String::new();
         }
-        
+
         let mut result = String::new();
-        
+
         // First block
         let text = &self.blocks[start_blk].text;
         let chars: Vec<char> = text.chars().collect();
@@ -624,20 +656,20 @@ impl Document {
             result.push_str(&chars[start_char..].iter().collect::<String>());
         }
         result.push('\n');
-        
+
         // Middle blocks
         for i in start_blk + 1..end_blk {
             result.push_str(&self.blocks[i].text);
             result.push('\n');
         }
-        
+
         // Last block
         let text = &self.blocks[end_blk].text;
         let chars: Vec<char> = text.chars().collect();
         if end_char <= chars.len() {
             result.push_str(&chars[..end_char].iter().collect::<String>());
         }
-        
+
         result
     }
 }
