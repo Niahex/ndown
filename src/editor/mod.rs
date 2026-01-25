@@ -74,6 +74,7 @@ live_design! {
 
         draw_cursor: { color: #ffffff }
         draw_selection: { color: (NORD_POLAR_3) }
+        draw_code_bg: { color: (NORD_POLAR_2) }
 
         animator: {
             blink = {
@@ -118,6 +119,8 @@ pub struct EditorArea {
     draw_cursor: DrawColor,
     #[live]
     draw_selection: DrawColor,
+    #[live]
+    draw_code_bg: DrawColor,
 
     #[animator]
     animator: Animator,
@@ -586,6 +589,7 @@ impl Widget for EditorArea {
             draw_text_quote: &mut self.draw_text_quote,
             draw_cursor: &mut self.draw_cursor,
             draw_selection: &mut self.draw_selection,
+            draw_code_bg: &mut self.draw_code_bg,
         };
 
         let is_cache_valid = !self.block_y_offsets.is_empty()

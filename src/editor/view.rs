@@ -16,6 +16,7 @@ pub struct EditorView<'a> {
     pub draw_text_quote: &'a mut DrawText,
     pub draw_cursor: &'a mut DrawColor,
     pub draw_selection: &'a mut DrawColor,
+    pub draw_code_bg: &'a mut DrawColor,
 }
 
 pub struct HitResult {
@@ -168,6 +169,16 @@ impl<'a> EditorView<'a> {
                     && current_y < params.rect.pos.y + params.rect.size.y;
 
                 if should_draw {
+                    if span.style.is_code {
+                         self.draw_code_bg.draw_abs(
+                            cx,
+                            Rect {
+                                pos: dvec2(current_x, current_y),
+                                size: dvec2(width, height),
+                            },
+                        );
+                    }
+
                     if let Some(((sel_start_blk, sel_start_char), (sel_end_blk, sel_end_char))) =
                         params.selection
                     {
