@@ -360,8 +360,12 @@ impl Document {
         }
 
         if let Some(idx) = span_to_remove {
-            if block.styles.len() > 1 {
-                block.styles.remove(idx);
+            block.styles.remove(idx);
+            if block.styles.is_empty() {
+                block.styles.push(StyleSpan {
+                    len: 0,
+                    style: StyleBits::default(),
+                });
             }
         }
 
@@ -425,6 +429,122 @@ impl Document {
                 prev.mark_dirty();
             }
             (start_blk, start_char)
+        }
+    }
+
+    pub fn toggle_formatting(&mut self, block_idx: usize, start: usize, end: usize, style_type: u8) {
+        if block_idx >= self.blocks.len() { return; }
+        
+        self.split_span_at(block_idx, end); 
+        self.split_span_at(block_idx, start);
+        
+        let block = &mut self.blocks[block_idx];
+        
+        let mut all_match = true;
+        let mut current_idx = 0;
+        let mut start_idx = None;
+        let mut end_idx = None;
+
+        for (i, span) in block.styles.iter().enumerate() {
+            let s_start = current_idx;
+            let s_end = current_idx + span.len;
+            
+            if s_end > start && s_start < end {
+                if start_idx.is_none() { start_idx = Some(i); }
+                end_idx = Some(i);
+                
+                let is_on = match style_type {
+                    0 => span.style.is_bold,
+                    1 => span.style.is_italic,
+                    2 => span.style.is_code,
+                    _ => false,
+                };
+                if !is_on {
+                    all_match = false;
+                }
+            }
+            current_idx += span.len;
+        }
+
+        if let (Some(first), Some(last)) = (start_idx, end_idx) {
+            let turn_on = !all_match;
+            for i in first..=last {
+                if turn_on {
+                    // Exclusive mode: Disable others when enabling one
+                    match style_type {
+                        0 => { // Bold
+                            block.styles[i].style.is_bold = true;
+                            block.styles[i].style.is_italic = false;
+                            block.styles[i].style.is_code = false;
+                        },
+                        1 => { // Italic
+                            block.styles[i].style.is_bold = false;
+                            block.styles[i].style.is_italic = true;
+                            block.styles[i].style.is_code = false;
+                        },
+                        2 => { // Code
+                            block.styles[i].style.is_bold = false;
+                            block.styles[i].style.is_italic = false;
+                            block.styles[i].style.is_code = true;
+                        },
+                        _ => {},
+                    }
+                } else {
+                    // Toggling off: Just disable the target style
+                    match style_type {
+                        0 => block.styles[i].style.is_bold = false,
+                        1 => block.styles[i].style.is_italic = false,
+                        2 => block.styles[i].style.is_code = false,
+                        _ => {},
+                    }
+                }
+            }
+        }
+
+        block.mark_dirty();
+        
+        let mut new_styles = Vec::new();
+        if !block.styles.is_empty() {
+             let mut current = block.styles[0].clone();
+             for next in block.styles.iter().skip(1) {
+                 if current.style.is_bold == next.style.is_bold &&
+                    current.style.is_italic == next.style.is_italic &&
+                    current.style.is_code == next.style.is_code {
+                     current.len += next.len;
+                 } else {
+                     new_styles.push(current);
+                     current = next.clone();
+                 }
+             }
+             new_styles.push(current);
+             block.styles = new_styles;
+        }
+    }
+
+    fn split_span_at(&mut self, block_idx: usize, char_pos: usize) {
+        let block = &mut self.blocks[block_idx];
+        let mut current_idx = 0;
+        let mut split_idx = None;
+        let mut split_len1 = 0;
+
+        for (i, span) in block.styles.iter().enumerate() {
+            if char_pos > current_idx && char_pos < current_idx + span.len {
+                split_idx = Some(i);
+                split_len1 = char_pos - current_idx;
+                break;
+            }
+            current_idx += span.len;
+        }
+
+        if let Some(i) = split_idx {
+            let original = block.styles[i].clone();
+            let mut span1 = original.clone();
+            span1.len = split_len1;
+            let mut span2 = original.clone();
+            span2.len = original.len - split_len1;
+            
+            block.styles[i] = span1;
+            block.styles.insert(i + 1, span2);
         }
     }
 }

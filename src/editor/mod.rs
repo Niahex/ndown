@@ -326,23 +326,16 @@ impl Widget for EditorArea {
                 }
 
                 if ctrl && (ke.key_code == KeyCode::KeyB || ke.key_code == KeyCode::KeyI) {
-                    let marker = if ke.key_code == KeyCode::KeyB { "**" } else { "*" };
-                    
                     if let Some(((start_blk, start_char), (end_blk, end_char))) = self.get_selection_range() {
                         if start_blk == end_blk {
-                            self.document.wrap_selection(start_blk, start_char, end_char, marker);
-                            // On place le curseur à la fin du bloc formaté
-                            // La longueur ajoutée est marker.len() * 2, mais apply_inline_formatting peut réduire la longueur visuelle
-                            // Le plus simple est de reset la sélection et mettre le curseur à la fin logique
-                            // Mais comme apply_inline_formatting change le texte (enlève les marqueurs), le calcul est complexe.
-                            // Si apply_inline_formatting réussit, les marqueurs sont "consommés" visuellement.
-                            // On va simplement redessiner et laisser le curseur à la fin (end_char), qui sera valide car le texte a potentiellement raccourci.
-                            // Wait, si apply_inline_formatting réussit, le texte est REMPLACÉ par sa version stylée (sans marqueurs).
-                            // Donc la longueur est la même qu'avant l'insertion des marqueurs !
-                            self.cursor_char = end_char;
-                            self.selection_anchor = None;
+                            let style_type = if ke.key_code == KeyCode::KeyB { 0 } else { 1 };
+                            self.document.toggle_formatting(start_blk, start_char, end_char, style_type);
+                            // La longueur du texte ne change pas avec toggle_formatting (juste les styles)
+                            // Donc pas besoin de toucher au curseur
+                            // On garde la selection pour pouvoir re-toggeler si besoin
                         }
                     } else {
+                        let marker = if ke.key_code == KeyCode::KeyB { "**" } else { "*" };
                         let insert_text = if ke.key_code == KeyCode::KeyB { "****" } else { "**" };
                         self.document.insert_text_at(self.cursor_block, self.cursor_char, insert_text);
                         self.cursor_char += marker.len();
