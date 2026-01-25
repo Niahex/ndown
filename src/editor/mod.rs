@@ -315,6 +315,13 @@ impl Widget for EditorArea {
                     return;
                 }
 
+                if ctrl && ke.key_code == KeyCode::KeyA {
+                    self.selection_anchor = Some((self.cursor_block, 0));
+                    self.cursor_char = self.document.blocks[self.cursor_block].text_len();
+                    self.redraw(cx);
+                    return;
+                }
+
                 if shift {
                     if self.selection_anchor.is_none() {
                         self.selection_anchor = Some((self.cursor_block, self.cursor_char));

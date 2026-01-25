@@ -4,7 +4,7 @@
 - ✅ Structure de base de l'application (Makepad)
 - ✅ Intégration initiale de l'interface (TopBar, Sidebars, Editor)
 - ✅ **Éditeur de texte "Custom" fonctionnel** :
-    - Saisie, Suppression, Sélection, Copier/Couper, Undo/Redo.
+    - Saisie, Suppression, Sélection (dont Ctrl+A), Copier/Couper, Undo/Redo.
 - ✅ **Rendu Markdown Riche** :
     - Parser (Titres, Gras, Italique, Code).
     - **Styles de police réels** (Gras, Italique, Headers).
