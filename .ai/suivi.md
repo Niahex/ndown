@@ -133,7 +133,7 @@
 
 #### Formatage Automatique
 - ✅ **Ctrl+B**: Gras (Exclusif : Remplace Italique/Code)
-- ✅ **Ctrl+I**: Italique (Exclusif : Remplace Gras/Code)
+- ✅ **Ctrl+I**: Italique (Exclusif : Remplace Gras/Code) il ne set pas bien : italic => **
 - ✅ Typing `# ` → Heading1
 - ✅ Typing `## ` → Heading2
 - ✅ Typing `### ` → Heading3
@@ -143,10 +143,10 @@
 - ✅ Typing `- ` → Liste à puces (Entrée pour nouvelle puce, Entrée sur vide pour désindenter/sortir)
 - ✅ Typing `1. ` → Liste numérotée (Numérotation auto, Entrée pour suivre, Indentation, Espacement dynamique)
 - ✅ **Tab / Shift+Tab** : Indenter / Désindenter les listes
-- ✅ Typing `**texte**` → Gras
-- ✅ Typing `*texte*` → Italique
+- ~ Typing `**texte**` → Gras need fix il se propage : Italics icisas'ecritencoreenbold
+- ~ Typing `*texte*` → Italique need fix il se propage : BOLD icisas'ecritencoreenbold
 - ✅ Typing `` `code` `` → Code inline (Fond grisé + Police monospace)
-- ✅ Sélection + `*` ou `**` ou `` ` `` → Wrap automatique
+- ✅ Sélection + `*` ou `**` ou `` ` `` → Wrap automatique il ne set pas bien : italic => **
 
 ---
 
