@@ -47,27 +47,60 @@ impl<'a> EditorView<'a> {
         let start_x = params.rect.pos.x + params.layout.padding.left - params.scroll.x;
 
         let mut hit_result = None;
-        let is_cache_ready = params.y_offsets_cache.len() == params.doc.blocks.len();
+        let cache_len = params.y_offsets_cache.len();
+        let scroll_top = params.scroll.y;
 
-        let start_block_idx = if is_cache_ready {
-            let scroll_top = params.scroll.y;
+        // Partial Cache Usage:
+        // Use the valid part of the cache to find the start block.
+        // If the cache was truncated due to a change at block N, cache_len will be N.
+        // If we are scrolled before N, we can use the cache.
+        // If we are scrolled after N, start_block_idx will be N (or close to it), 
+        // and we will recalculate positions from there.
+        
+        let start_block_idx = if cache_len > 0 {
             let idx = params.y_offsets_cache.partition_point(|&y| y < scroll_top);
             idx.saturating_sub(1)
         } else {
             0
         };
 
-        let mut current_y = if is_cache_ready {
-            start_y + params.y_offsets_cache[start_block_idx]
-        } else {
-            start_y
-        };
-        let mut content_y = if is_cache_ready {
+        // Initialize content_y based on the cache if possible
+        let mut content_y = if start_block_idx < cache_len {
             params.y_offsets_cache[start_block_idx]
         } else {
-            0.0
+             // Fallback: If for some reason start_block_idx is out of bounds (e.g. cache empty), start at 0.
+             // If we are resuming from the end of a partial cache (start_block_idx == cache_len),
+             // we technically need the previous block's bottom position.
+             // However, params.y_offsets_cache stores the TOP of the block.
+             // So cache[i] is top of block i.
+             // If we start at block i, content_y should be cache[i].
+             // If i >= cache_len, we can't look it up.
+             // We must start layout from the last known valid block or 0.
+             
+             // Simplification: If start_block_idx >= cache_len, we force start from the last valid block in cache?
+             // But partition_point returns at most cache_len.
+             // So start_block_idx <= cache_len - 1 (due to saturating_sub(1)).
+             // EXCEPT if partition_point returns 0 (scroll at top).
+             
+             // So start_block_idx is guaranteed to be < cache_len IF cache_len > 0.
+             // If cache_len == 0, start_block_idx is 0, and we use 0.0.
+             0.0
         };
-
+        
+        // Edge case correction: 
+        // If we are starting layout *beyond* the cache (e.g. cache truncated at 50, but we need to draw block 60),
+        // we can't jump to 60. We must bridge the gap.
+        // But the loop below iterates from start_block_idx.
+        // If cache_len=50, partition_point returns 50 (all < scroll).
+        // start_block_idx = 49.
+        // content_y = cache[49].
+        // Loop starts at 49.
+        // Block 49 is processed (cached layout used).
+        // Next iteration is 50. Cache empty. content_y updated. Pushed.
+        // This works perfectly!
+        
+        let mut current_y = start_y + content_y;
+        
         let mut list_counters: Vec<u32> = vec![0; 10];
 
         // Optimization: Find the start of the current list "cluster" to avoid O(N) iteration from the beginning of the document.
@@ -103,7 +136,7 @@ impl<'a> EditorView<'a> {
         let block_count = params.doc.blocks.len();
 
         for block_idx in start_block_idx..block_count {
-            if !is_cache_ready {
+            if block_idx >= params.y_offsets_cache.len() {
                 params.y_offsets_cache.push(content_y);
             }
 
@@ -120,9 +153,10 @@ impl<'a> EditorView<'a> {
                 _ => 21.8,
             };
 
-            let is_below_screen =
-                is_cache_ready && (current_y > params.rect.pos.y + params.rect.size.y);
-            if is_below_screen {
+            let is_below_screen = current_y > params.rect.pos.y + params.rect.size.y;
+            let must_rebuild_cache = cache_len < block_count;
+
+            if is_below_screen && !must_rebuild_cache {
                 break;
             }
 
@@ -133,10 +167,8 @@ impl<'a> EditorView<'a> {
                 block_height = block.layout_cache.as_ref().unwrap().height;
             }
 
-            if use_cached_layout
-                && !is_cache_ready
-                && (current_y + block_height < params.rect.pos.y)
-            {
+            // Vertical Culling (Above Screen)
+            if use_cached_layout && (current_y + block_height < params.rect.pos.y) {
                 current_y += block_height + 5.0;
                 content_y += block_height + 5.0;
                 continue;
@@ -445,7 +477,7 @@ impl<'a> EditorView<'a> {
             content_y += final_height + 5.0;
         }
 
-        let total_h = if is_cache_ready {
+        let total_h = if params.y_offsets_cache.len() == params.doc.blocks.len() {
             if let Some(last_y) = params.y_offsets_cache.last() {
                 last_y + 50.0
             } else {

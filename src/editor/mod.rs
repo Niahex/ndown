@@ -247,47 +247,58 @@ impl EditorArea {
         self.block_y_offsets.clear();
     }
 
-    // CHARGEMENT SYNCHRONE (Temporaire pour valider)
+    fn invalidate_layout_from(&mut self, block_idx: usize) {
+        if block_idx < self.block_y_offsets.len() {
+            self.block_y_offsets.truncate(block_idx);
+        }
+    }
+
+    // CHARGEMENT SYNCHRONE (Optimisé avec BufReader)
     pub fn load_file(&mut self, _cx: &mut Cx, filename: String) {
-        if let Ok(content) = std::fs::read_to_string(&filename) {
-            let mut new_blocks = Vec::new();
+        use std::io::BufRead;
+        if let Ok(file) = std::fs::File::open(&filename) {
+            let reader = std::io::BufReader::new(file);
+            let mut new_blocks = Vec::with_capacity(1024);
             let mut id_gen = 1000;
-            for line in content.lines() {
-                let ty = if line.starts_with("# ") {
-                    BlockType::Heading1
-                } else if line.starts_with("## ") {
-                    BlockType::Heading2
-                } else if line.starts_with("### ") {
-                    BlockType::Heading3
-                } else if line.starts_with("#### ") {
-                    BlockType::Heading4
-                } else if line.starts_with("##### ") {
-                    BlockType::Heading5
-                } else if line.starts_with("> ") {
-                    BlockType::Quote
-                } else {
-                    BlockType::Paragraph
-                };
+            
+            for line_res in reader.lines() {
+                if let Ok(line) = line_res {
+                    let ty = if line.starts_with("# ") {
+                        BlockType::Heading1
+                    } else if line.starts_with("## ") {
+                        BlockType::Heading2
+                    } else if line.starts_with("### ") {
+                        BlockType::Heading3
+                    } else if line.starts_with("#### ") {
+                        BlockType::Heading4
+                    } else if line.starts_with("##### ") {
+                        BlockType::Heading5
+                    } else if line.starts_with("> ") {
+                        BlockType::Quote
+                    } else {
+                        BlockType::Paragraph
+                    };
 
-                let text = if matches!(ty, BlockType::Heading1) {
-                    &line[2..]
-                } else if matches!(ty, BlockType::Heading2) {
-                    &line[3..]
-                } else if matches!(ty, BlockType::Heading3) {
-                    &line[4..]
-                } else if matches!(ty, BlockType::Heading4) {
-                    &line[5..]
-                } else if matches!(ty, BlockType::Heading5) {
-                    &line[6..]
-                } else if matches!(ty, BlockType::Quote) {
-                    &line[2..]
-                } else {
-                    line
-                };
+                    let text = if matches!(ty, BlockType::Heading1) {
+                        &line[2..]
+                    } else if matches!(ty, BlockType::Heading2) {
+                        &line[3..]
+                    } else if matches!(ty, BlockType::Heading3) {
+                        &line[4..]
+                    } else if matches!(ty, BlockType::Heading4) {
+                        &line[5..]
+                    } else if matches!(ty, BlockType::Heading5) {
+                        &line[6..]
+                    } else if matches!(ty, BlockType::Quote) {
+                        &line[2..]
+                    } else {
+                        &line
+                    };
 
-                let block = Block::new(id_gen, ty, text);
-                id_gen += 1;
-                new_blocks.push(block);
+                    let block = Block::new(id_gen, ty, text);
+                    id_gen += 1;
+                    new_blocks.push(block);
+                }
             }
 
             if new_blocks.is_empty() {
@@ -366,7 +377,7 @@ impl Widget for EditorArea {
                     self.cursor_block = start.0;
                     self.cursor_char = start.1;
                     self.selection_anchor = None;
-                    self.invalidate_layout();
+                    self.invalidate_layout_from(start.0);
                     self.redraw(cx);
                 } else {
                     *e.response.borrow_mut() = None;
@@ -418,7 +429,7 @@ impl Widget for EditorArea {
                         self.cursor_block = start.0;
                         self.cursor_char = start.1;
                         self.selection_anchor = None;
-                        self.invalidate_layout();
+                        self.invalidate_layout_from(start.0);
                         self.redraw(cx);
                     }
                     return;
@@ -433,10 +444,12 @@ impl Widget for EditorArea {
 
                     if let Some(text) = text_opt {
                         if !text.is_empty() {
+                            let mut start_block = self.cursor_block;
                             if let Some((start, end)) = self.get_selection_range() {
                                 self.document.delete_range(start, end);
                                 self.cursor_block = start.0;
                                 self.cursor_char = start.1;
+                                start_block = start.0;
                                 self.selection_anchor = None;
                             }
 
@@ -485,7 +498,7 @@ impl Widget for EditorArea {
                                 self.cursor_char += added;
                             }
 
-                            self.invalidate_layout();
+                            self.invalidate_layout_from(start_block);
                             self.redraw(cx);
                         }
                     }
@@ -549,12 +562,12 @@ impl Widget for EditorArea {
                         if shift {
                             if self.document.blocks[self.cursor_block].indent > 0 {
                                 self.document.blocks[self.cursor_block].indent -= 1;
-                                self.invalidate_layout();
+                                self.invalidate_layout_from(self.cursor_block);
                             }
                         } else if self.document.blocks[self.cursor_block].indent < 10 {
                             // Max indentation
                             self.document.blocks[self.cursor_block].indent += 1;
-                            self.invalidate_layout();
+                            self.invalidate_layout_from(self.cursor_block);
                         }
                     }
                     self.redraw(cx);
@@ -612,7 +625,7 @@ impl Widget for EditorArea {
                             } else {
                                 self.document.blocks[self.cursor_block].ty = BlockType::Paragraph;
                             }
-                            self.invalidate_layout();
+                            self.invalidate_layout_from(self.cursor_block);
                             self.redraw(cx);
                             return;
                         }
@@ -637,9 +650,10 @@ impl Widget for EditorArea {
                         self.document
                             .blocks
                             .insert(self.cursor_block + 1, new_block);
+                        let invalid_from = self.cursor_block;
                         self.cursor_block += 1;
                         self.cursor_char = 0;
-                        self.invalidate_layout();
+                        self.invalidate_layout_from(invalid_from);
                     }
                     KeyCode::Delete => {
                         if ctrl {
@@ -650,7 +664,7 @@ impl Widget for EditorArea {
                                     (self.cursor_block, end),
                                 );
                                 self.document.delete_range(range.0, range.1);
-                                self.invalidate_layout();
+                                self.invalidate_layout_from(self.cursor_block);
                             }
                         } else if let Some((start, end)) = self.get_selection_range() {
                             if start != end {
@@ -658,20 +672,22 @@ impl Widget for EditorArea {
                                 self.cursor_block = new_cursor.0;
                                 self.cursor_char = new_cursor.1;
                                 self.selection_anchor = None;
-                                self.invalidate_layout();
+                                self.invalidate_layout_from(self.cursor_block);
                             }
                         } else {
                             let block = &mut self.document.blocks[self.cursor_block];
                             if self.cursor_char < block.text_len() {
                                 self.document
                                     .remove_char_at(self.cursor_block, self.cursor_char);
+                                // Layout might change (wrapping)
+                                self.invalidate_layout_from(self.cursor_block);
                             } else if self.cursor_block < self.document.blocks.len() - 1
                                 && self
                                     .document
                                     .merge_block_with_prev(self.cursor_block + 1)
                                     .is_some()
                             {
-                                self.invalidate_layout();
+                                self.invalidate_layout_from(self.cursor_block);
                             }
                         }
                     }
@@ -686,7 +702,7 @@ impl Widget for EditorArea {
                                 let new_cursor = self.document.delete_range(range.0, range.1);
                                 self.cursor_block = new_cursor.0;
                                 self.cursor_char = new_cursor.1;
-                                self.invalidate_layout();
+                                self.invalidate_layout_from(self.cursor_block);
                             }
                         } else if let Some((start, end)) = self.get_selection_range() {
                             if start != end {
@@ -694,7 +710,7 @@ impl Widget for EditorArea {
                                 self.cursor_block = new_cursor.0;
                                 self.cursor_char = new_cursor.1;
                                 self.selection_anchor = None;
-                                self.invalidate_layout();
+                                self.invalidate_layout_from(self.cursor_block);
                             } else {
                                 self.selection_anchor = None;
                                 if self.cursor_char > 0 {
@@ -703,6 +719,7 @@ impl Widget for EditorArea {
                                         .remove_char_at(self.cursor_block, self.cursor_char - 1)
                                     {
                                         self.cursor_char -= 1;
+                                        self.invalidate_layout_from(self.cursor_block);
                                     }
                                 } else if self.cursor_block > 0 {
                                     let current_type =
@@ -710,12 +727,13 @@ impl Widget for EditorArea {
                                     if current_type != BlockType::Paragraph {
                                         self.document.blocks[self.cursor_block].ty =
                                             BlockType::Paragraph;
+                                        self.invalidate_layout_from(self.cursor_block);
                                     } else if let Some(new_char_pos) =
                                         self.document.merge_block_with_prev(self.cursor_block)
                                     {
                                         self.cursor_block -= 1;
                                         self.cursor_char = new_char_pos;
-                                        self.invalidate_layout();
+                                        self.invalidate_layout_from(self.cursor_block);
                                     }
                                 } else {
                                     let current_type =
@@ -723,6 +741,7 @@ impl Widget for EditorArea {
                                     if current_type != BlockType::Paragraph {
                                         self.document.blocks[self.cursor_block].ty =
                                             BlockType::Paragraph;
+                                        self.invalidate_layout_from(self.cursor_block);
                                     }
                                 }
                             }
@@ -732,22 +751,25 @@ impl Widget for EditorArea {
                                 .remove_char_at(self.cursor_block, self.cursor_char - 1)
                             {
                                 self.cursor_char -= 1;
+                                self.invalidate_layout_from(self.cursor_block);
                             }
                         } else if self.cursor_block > 0 {
                             let current_type = self.document.blocks[self.cursor_block].ty.clone();
                             if current_type != BlockType::Paragraph {
                                 self.document.blocks[self.cursor_block].ty = BlockType::Paragraph;
+                                self.invalidate_layout_from(self.cursor_block);
                             } else if let Some(new_char_pos) =
                                 self.document.merge_block_with_prev(self.cursor_block)
                             {
                                 self.cursor_block -= 1;
                                 self.cursor_char = new_char_pos;
-                                self.invalidate_layout();
+                                self.invalidate_layout_from(self.cursor_block);
                             }
                         } else {
                             let current_type = self.document.blocks[self.cursor_block].ty.clone();
                             if current_type != BlockType::Paragraph {
                                 self.document.blocks[self.cursor_block].ty = BlockType::Paragraph;
+                                self.invalidate_layout_from(self.cursor_block);
                             }
                         }
                     }
@@ -782,6 +804,10 @@ impl Widget for EditorArea {
                                 self.selection_anchor = Some((start_blk, start_char));
                             }
                             wrapped = true;
+                            // Formatting change doesn't usually change layout height unless font size changes or code block
+                            // but wrap_selection might change width.
+                            // We can invalidate safely.
+                            self.invalidate_layout_from(start_blk);
                         }
                     }
 
@@ -791,7 +817,7 @@ impl Widget for EditorArea {
                                 let new_cursor = self.document.delete_range(start, end);
                                 self.cursor_block = new_cursor.0;
                                 self.cursor_char = new_cursor.1;
-                                self.invalidate_layout();
+                                self.invalidate_layout_from(self.cursor_block);
                             }
                             self.selection_anchor = None;
                         }
@@ -814,6 +840,7 @@ impl Widget for EditorArea {
                         {
                             self.cursor_char = self.document.blocks[self.cursor_block].text_len();
                         }
+                        self.invalidate_layout_from(self.cursor_block);
                     }
                     self.redraw(cx);
                 }
