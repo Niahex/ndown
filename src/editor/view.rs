@@ -143,11 +143,15 @@ impl<'a> EditorView<'a> {
                  for i in level+1..list_counters.len() { list_counters[i] = 0; }
 
                  current_x += (block.indent as f64) * 20.0;
+                 
+                 let prefix = format!("{}. ", list_counters[level]);
+                 let prefix_layout = self.draw_text_reg.layout(cx, 0.0, 0.0, None, false, Align::default(), &prefix);
+                 let prefix_width = prefix_layout.size_in_lpxs.width as f64;
+
                  if current_y >= params.rect.pos.y && current_y < params.rect.pos.y + params.rect.size.y {
-                     let prefix = format!("{}. ", list_counters[level]);
                      self.draw_text_reg.draw_abs(cx, dvec2(current_x, current_y), &prefix);
                  }
-                 current_x += 25.0; 
+                 current_x += prefix_width + 5.0; 
             }
 
             let mut max_h_calc = 0.0;

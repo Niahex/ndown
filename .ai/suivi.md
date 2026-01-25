@@ -139,7 +139,7 @@
 - ✅ Typing `##### ` → Heading5
 - ✅ Typing `> ` → Quote
 - ✅ Typing `- ` → Liste à puces (Entrée pour nouvelle puce, Entrée sur vide pour désindenter/sortir)
-- ✅ Typing `1. ` → Liste numérotée (Numérotation auto, Entrée pour suivre, Indentation)
+- ✅ Typing `1. ` → Liste numérotée (Numérotation auto, Entrée pour suivre, Indentation, Espacement dynamique)
 - ✅ **Tab / Shift+Tab** : Indenter / Désindenter les listes
 - ✅ Typing `**texte**` → Gras
 - ✅ Typing `*texte*` → Italique
