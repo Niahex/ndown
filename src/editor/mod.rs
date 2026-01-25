@@ -866,7 +866,7 @@ impl Widget for EditorArea {
         // Handle Async Actions
         if let Event::Actions(actions) = event {
             for action in actions {
-                let editor_action = action.as_widget_action().cast::<EditorAction>();
+                let editor_action: EditorAction = action.cast();
                 match editor_action {
                     EditorAction::AsyncFileLoaded(path, blocks) => {
                         self.document.blocks = blocks;

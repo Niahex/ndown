@@ -119,7 +119,7 @@ impl Widget for FileExplorer {
 
         if let Event::Actions(actions) = event {
             for action in actions {
-                let fe_action = action.as_widget_action().cast::<FileExplorerAction>();
+                let fe_action: FileExplorerAction = action.cast();
                 match fe_action {
                     FileExplorerAction::AsyncFilesLoaded(files) => {
                         self.files = files;
