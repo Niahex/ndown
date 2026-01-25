@@ -146,6 +146,8 @@ pub struct EditorArea {
     is_dragging: bool,
     #[rust]
     deferred_finger_tap: Option<DVec2>,
+    #[rust]
+    clipboard: Option<arboard::Clipboard>,
 
     #[rust]
     block_y_offsets: Vec<f64>,
@@ -159,6 +161,7 @@ impl LiveHook for EditorArea {
         self.cursor_block = 0;
         self.cursor_char = 0;
         self.blink_timer = cx.start_timeout(0.5);
+        self.clipboard = arboard::Clipboard::new().ok();
     }
 }
 
@@ -352,7 +355,7 @@ impl Widget for EditorArea {
                 if ctrl && ke.key_code == KeyCode::KeyC {
                     if let Some((start, end)) = self.get_selection_range() {
                         let text = self.document.get_text_in_range(start, end);
-                        if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                        if let Some(clipboard) = &mut self.clipboard {
                             let _ = clipboard.set_text(text);
                         } else {
                             cx.copy_to_clipboard(&text);
@@ -364,7 +367,7 @@ impl Widget for EditorArea {
                 if ctrl && ke.key_code == KeyCode::KeyX {
                     if let Some((start, end)) = self.get_selection_range() {
                         let text = self.document.get_text_in_range(start, end);
-                        if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                        if let Some(clipboard) = &mut self.clipboard {
                             let _ = clipboard.set_text(text);
                         } else {
                             cx.copy_to_clipboard(&text);
@@ -380,7 +383,7 @@ impl Widget for EditorArea {
                 }
 
                 if ctrl && ke.key_code == KeyCode::KeyV {
-                    let text_opt = if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                    let text_opt = if let Some(clipboard) = &mut self.clipboard {
                         clipboard.get_text().ok()
                     } else {
                         None

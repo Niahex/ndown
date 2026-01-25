@@ -125,7 +125,7 @@
   - Supprimer caractère suivant
   - Fusionner avec bloc suivant si fin de bloc
   - Ctrl+Delete: Supprimer mot suivant
-- ✅ **Copier/Couper**: Via `arboard` (ou `cx.copy` en fallback)
+- ✅ **Copier/Couper**: Via `arboard` (Persistant, fix Wayland 100ms drop)
 - ✅ **Coller**: Via `arboard` (Support multiligne robuste)
 
 #### Fichier
