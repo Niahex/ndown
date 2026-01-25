@@ -6,7 +6,7 @@ pub mod theme;
 
 pub mod editor;
 pub mod file_explorer;
-pub mod outline_panel;
+pub mod panel;
 pub mod top_bar;
 
 pub fn live_design(cx: &mut Cx) {
@@ -16,6 +16,6 @@ pub fn live_design(cx: &mut Cx) {
     theme::live_design(cx);
     editor::live_design(cx);
     file_explorer::live_design(cx);
-    outline_panel::live_design(cx);
+    panel::live_design(cx);
     top_bar::live_design(cx);
 }

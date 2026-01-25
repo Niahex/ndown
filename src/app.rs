@@ -11,7 +11,7 @@ live_design! {
 
     use crate::top_bar::*;
     use crate::file_explorer::*;
-    use crate::outline_panel::*;
+    use crate::panel::*;
     use crate::editor::*;
 
     App = {{App}} {
