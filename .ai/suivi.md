@@ -482,6 +482,8 @@ Fonction centrale de rendu avec optimisations avancées.
 ## Optimisations Réalisées
 
 - ✅ **Rendu Zero-Copy**: Suppression des allocations `String` par span dans `EditorView::draw_document`. Utilisation de slices sur le texte du bloc pour le rendu, la sélection et le calcul du curseur.
+- ✅ **Navigation Optimisée**: `find_prev_word` et `find_next_word` utilisent des itérateurs directs sans allocation mémoire.
+- ✅ **Suppression Optimisée**: `delete_range` utilise `String::replace_range` et reconstruit les styles en une seule passe (O(N) vs O(M*N)).
 
 ## Points d'Amélioration Identifiés
 

@@ -191,13 +191,26 @@ impl EditorArea {
         }
         let block = &self.document.blocks[self.cursor_block];
         let text = block.full_text();
-        let chars: Vec<char> = text.chars().collect();
+        
+        // Skip whitespace backwards
         let mut i = self.cursor_char;
-        while i > 0 && chars[i - 1].is_whitespace() {
+        while i > 0 {
+            if let Some(c) = text.chars().nth(i - 1) {
+                 if !c.is_whitespace() {
+                     break;
+                 }
+            }
             i -= 1;
         }
-        while i > 0 && !chars[i - 1].is_whitespace() {
-            i -= 1;
+        
+        // Skip non-whitespace backwards
+        while i > 0 {
+             if let Some(c) = text.chars().nth(i - 1) {
+                 if c.is_whitespace() {
+                     break;
+                 }
+             }
+             i -= 1;
         }
         i
     }
@@ -205,13 +218,26 @@ impl EditorArea {
     fn find_next_word(&self) -> usize {
         let block = &self.document.blocks[self.cursor_block];
         let text = block.full_text();
-        let chars: Vec<char> = text.chars().collect();
-        let len = chars.len();
+        let len = block.text_len();
         let mut i = self.cursor_char;
-        while i < len && chars[i].is_whitespace() {
-            i += 1;
+        
+        // Skip whitespace forwards
+        while i < len {
+            if let Some(c) = text.chars().nth(i) {
+                if !c.is_whitespace() {
+                    break;
+                }
+            }
+             i += 1;
         }
-        while i < len && !chars[i].is_whitespace() {
+        
+        // Skip non-whitespace forwards
+        while i < len {
+             if let Some(c) = text.chars().nth(i) {
+                if c.is_whitespace() {
+                    break;
+                }
+            }
             i += 1;
         }
         i

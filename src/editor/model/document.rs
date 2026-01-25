@@ -474,10 +474,73 @@ impl Document {
         let (end_blk, end_char) = end;
 
         if start_blk == end_blk {
-            let count = end_char - start_char;
-            for _ in 0..count {
-                self.remove_char_at(start_blk, start_char);
+            if start_char == end_char {
+                return (start_blk, start_char);
             }
+            let block = &mut self.blocks[start_blk];
+            
+            // Calculate byte offsets for efficient removal
+            let start_byte = block
+                .text
+                .char_indices()
+                .nth(start_char)
+                .map(|(i, _)| i)
+                .unwrap_or(block.text.len());
+            let end_byte = block
+                .text
+                .char_indices()
+                .nth(end_char)
+                .map(|(i, _)| i)
+                .unwrap_or(block.text.len());
+
+            block.text.replace_range(start_byte..end_byte, "");
+            block.mark_dirty();
+
+            // Rebuild styles efficiently
+            let mut new_styles = Vec::with_capacity(block.styles.len());
+            let mut current_idx = 0;
+
+            for span in &block.styles {
+                let span_start = current_idx;
+                let span_end = current_idx + span.len;
+
+                if span_end <= start_char {
+                    // Span is entirely before deleted range
+                    new_styles.push(span.clone());
+                } else if span_start >= end_char {
+                    // Span is entirely after deleted range
+                    new_styles.push(span.clone());
+                } else {
+                    // Span overlaps with deleted range
+                    let keep_start = if span_start < start_char {
+                        start_char - span_start
+                    } else {
+                        0
+                    };
+                    let keep_end = if span_end > end_char {
+                        span_end - end_char
+                    } else {
+                        0
+                    };
+                    
+                    let new_len = keep_start + keep_end;
+                    if new_len > 0 {
+                        let mut new_span = span.clone();
+                        new_span.len = new_len;
+                        new_styles.push(new_span);
+                    }
+                }
+                current_idx += span.len;
+            }
+
+            if new_styles.is_empty() {
+                new_styles.push(StyleSpan {
+                    len: 0,
+                    style: StyleBits::default(),
+                });
+            }
+            block.styles = new_styles;
+            
             (start_blk, start_char)
         } else {
             let first_len = self.blocks[start_blk].text_len();
