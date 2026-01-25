@@ -55,19 +55,31 @@ impl Document {
         let file = File::create(filename)?;
         let mut writer = BufWriter::new(file);
 
+        let mut ordered_list_counter = 1;
+
         for (i, block) in self.blocks.iter().enumerate() {
+            // Reset counter if not in an ordered list
+            if block.ty != BlockType::OrderedListItem {
+                ordered_list_counter = 1;
+            }
+
             let prefix = match block.ty {
-                BlockType::Heading1 => "# ",
-                BlockType::Heading2 => "## ",
-                BlockType::Heading3 => "### ",
-                BlockType::Heading4 => "#### ",
-                BlockType::Heading5 => "##### ",
-                BlockType::Quote => "> ",
-                BlockType::ListItem => "- ",
-                _ => "",
+                BlockType::Heading1 => "# ".to_string(),
+                BlockType::Heading2 => "## ".to_string(),
+                BlockType::Heading3 => "### ".to_string(),
+                BlockType::Heading4 => "#### ".to_string(),
+                BlockType::Heading5 => "##### ".to_string(),
+                BlockType::Quote => "> ".to_string(),
+                BlockType::ListItem => "- ".to_string(),
+                BlockType::OrderedListItem => {
+                    let p = format!("{}. ", ordered_list_counter);
+                    ordered_list_counter += 1;
+                    p
+                }
+                _ => "".to_string(),
             };
 
-            if block.ty == BlockType::ListItem && block.indent > 0 {
+            if (block.ty == BlockType::ListItem || block.ty == BlockType::OrderedListItem) && block.indent > 0 {
                 for _ in 0..block.indent {
                     writer.write_all(b"  ")?;
                 }
@@ -152,7 +164,23 @@ impl Document {
                     }
                     Some(remove_count)
                 } else {
-                    None
+                     // Check for Ordered List Item (1. )
+                    let mut digit_end = space_count;
+                    while digit_end < chars.len() && chars[digit_end].is_ascii_digit() {
+                        digit_end += 1;
+                    }
+                    if digit_end > space_count && digit_end < chars.len() && chars[digit_end] == '.' && digit_end + 1 < chars.len() && chars[digit_end+1] == ' ' {
+                        block.ty = BlockType::OrderedListItem;
+                        block.indent = (space_count / 2) as u8;
+                        let remove_count = digit_end + 2; // spaces + digits + ". "
+                        block.text.replace_range(0..remove_count, "");
+                         if let Some(first) = block.styles.first_mut() {
+                            first.len = first.len.saturating_sub(remove_count);
+                        }
+                        Some(remove_count)
+                    } else {
+                        None
+                    }
                 }
             }
         } else {

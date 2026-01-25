@@ -361,7 +361,8 @@ impl Widget for EditorArea {
                 }
 
                 if ke.key_code == KeyCode::Tab {
-                    if self.document.blocks[self.cursor_block].ty == BlockType::ListItem {
+                    let current_ty = self.document.blocks[self.cursor_block].ty.clone();
+                    if current_ty == BlockType::ListItem || current_ty == BlockType::OrderedListItem {
                         if shift {
                             if self.document.blocks[self.cursor_block].indent > 0 {
                                 self.document.blocks[self.cursor_block].indent -= 1;
@@ -420,7 +421,7 @@ impl Widget for EditorArea {
                         let current_len = self.document.blocks[self.cursor_block].text_len();
                         
                         // Exit list if empty item
-                        if current_ty == BlockType::ListItem && current_len == 0 {
+                        if (current_ty == BlockType::ListItem || current_ty == BlockType::OrderedListItem) && current_len == 0 {
                             if self.document.blocks[self.cursor_block].indent > 0 {
                                 self.document.blocks[self.cursor_block].indent -= 1;
                             } else {
@@ -433,6 +434,8 @@ impl Widget for EditorArea {
 
                         let (new_ty, new_indent) = if current_ty == BlockType::ListItem {
                             (BlockType::ListItem, self.document.blocks[self.cursor_block].indent)
+                        } else if current_ty == BlockType::OrderedListItem {
+                            (BlockType::OrderedListItem, self.document.blocks[self.cursor_block].indent)
                         } else {
                             (BlockType::Paragraph, 0)
                         };

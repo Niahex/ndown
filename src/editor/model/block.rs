@@ -10,6 +10,7 @@ pub enum BlockType {
     Heading5,
     Quote,
     ListItem,
+    OrderedListItem,
     CodeBlock,
 }
 
