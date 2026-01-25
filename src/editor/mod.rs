@@ -360,6 +360,24 @@ impl Widget for EditorArea {
                     }
                 }
 
+                if ke.key_code == KeyCode::Tab {
+                    if self.document.blocks[self.cursor_block].ty == BlockType::ListItem {
+                        if shift {
+                            if self.document.blocks[self.cursor_block].indent > 0 {
+                                self.document.blocks[self.cursor_block].indent -= 1;
+                                self.invalidate_layout();
+                            }
+                        } else {
+                            if self.document.blocks[self.cursor_block].indent < 10 { // Max indentation
+                                self.document.blocks[self.cursor_block].indent += 1;
+                                self.invalidate_layout();
+                            }
+                        }
+                    }
+                    self.redraw(cx);
+                    return; // Consommer l'événement Tab pour ne pas perdre le focus ou insérer de tab
+                }
+
                 match ke.key_code {
                     KeyCode::ArrowUp => {
                         if self.cursor_block > 0 {
@@ -403,19 +421,25 @@ impl Widget for EditorArea {
                         
                         // Exit list if empty item
                         if current_ty == BlockType::ListItem && current_len == 0 {
-                            self.document.blocks[self.cursor_block].ty = BlockType::Paragraph;
+                            if self.document.blocks[self.cursor_block].indent > 0 {
+                                self.document.blocks[self.cursor_block].indent -= 1;
+                            } else {
+                                self.document.blocks[self.cursor_block].ty = BlockType::Paragraph;
+                            }
                             self.invalidate_layout();
                             self.redraw(cx);
                             return;
                         }
 
-                        let new_ty = if current_ty == BlockType::ListItem {
-                            BlockType::ListItem
+                        let (new_ty, new_indent) = if current_ty == BlockType::ListItem {
+                            (BlockType::ListItem, self.document.blocks[self.cursor_block].indent)
                         } else {
-                            BlockType::Paragraph
+                            (BlockType::Paragraph, 0)
                         };
                         
-                        let new_block = Block::new(self.document.generate_id(), new_ty, "");
+                        let mut new_block = Block::new(self.document.generate_id(), new_ty, "");
+                        new_block.indent = new_indent;
+                        
                         self.document
                             .blocks
                             .insert(self.cursor_block + 1, new_block);

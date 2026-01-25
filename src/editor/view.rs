@@ -112,6 +112,7 @@ impl<'a> EditorView<'a> {
             let mut current_x = start_x;
 
             if block.ty == BlockType::ListItem {
+                 current_x += (block.indent as f64) * 20.0;
                  if current_y >= params.rect.pos.y && current_y < params.rect.pos.y + params.rect.size.y {
                      self.draw_text_reg.draw_abs(cx, dvec2(current_x, current_y), "• ");
                  }

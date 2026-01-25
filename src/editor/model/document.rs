@@ -66,6 +66,13 @@ impl Document {
                 BlockType::ListItem => "- ",
                 _ => "",
             };
+
+            if block.ty == BlockType::ListItem && block.indent > 0 {
+                for _ in 0..block.indent {
+                    writer.write_all(b"  ")?;
+                }
+            }
+            
             writer.write_all(prefix.as_bytes())?;
 
             block.write_markdown_to_writer(&mut writer)?;
@@ -127,15 +134,26 @@ impl Document {
                     first.len = first.len.saturating_sub(2);
                 }
                 Some(2)
-            } else if block.text.starts_with("- ") {
-                block.ty = BlockType::ListItem;
-                block.text.replace_range(0..2, "");
-                if let Some(first) = block.styles.first_mut() {
-                    first.len = first.len.saturating_sub(2);
-                }
-                Some(2)
             } else {
-                None
+                // Check for List Item with indentation
+                let mut space_count = 0;
+                let chars: Vec<char> = block.text.chars().collect();
+                while space_count < chars.len() && chars[space_count] == ' ' {
+                    space_count += 1;
+                }
+                
+                if space_count < chars.len() && chars[space_count] == '-' && space_count + 1 < chars.len() && chars[space_count+1] == ' ' {
+                    block.ty = BlockType::ListItem;
+                    block.indent = (space_count / 2) as u8; // Assuming 2 spaces per indent
+                    let remove_count = space_count + 2; // spaces + "- "
+                    block.text.replace_range(0..remove_count, "");
+                    if let Some(first) = block.styles.first_mut() {
+                        first.len = first.len.saturating_sub(remove_count);
+                    }
+                    Some(remove_count)
+                } else {
+                    None
+                }
             }
         } else {
             None

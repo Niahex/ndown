@@ -138,7 +138,8 @@
 - ✅ Typing `#### ` → Heading4
 - ✅ Typing `##### ` → Heading5
 - ✅ Typing `> ` → Quote
-- ✅ Typing `- ` → Liste à puces (Entrée pour nouvelle puce, Entrée sur vide pour sortir)
+- ✅ Typing `- ` → Liste à puces (Entrée pour nouvelle puce, Entrée sur vide pour désindenter/sortir)
+- ✅ **Tab / Shift+Tab** : Indenter / Désindenter les listes
 - ✅ Typing `**texte**` → Gras
 - ✅ Typing `*texte*` → Italique
 - ✅ Typing `` `code` `` → Code inline (Fond grisé + Police monospace)

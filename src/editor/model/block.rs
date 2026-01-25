@@ -37,6 +37,7 @@ pub struct Block {
     pub id: u64,
     pub ty: BlockType,
     pub text: String,
+    pub indent: u8,
     pub styles: Vec<StyleSpan>,
     pub layout_cache: Option<BlockLayoutCache>,
     pub is_dirty: bool,
@@ -48,6 +49,7 @@ impl Block {
             id,
             ty,
             text: text.to_string(),
+            indent: 0,
             styles: vec![StyleSpan {
                 len: text.chars().count(),
                 style: StyleBits::default(),
