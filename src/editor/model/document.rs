@@ -209,6 +209,19 @@ impl Document {
             return false;
         }
 
+        {
+            let block = &self.blocks[block_idx];
+            let has_active_styles = block
+                .styles
+                .iter()
+                .any(|s| s.style.is_bold || s.style.is_italic || s.style.is_code);
+            let text_has_markers = block.text.contains('*') || block.text.contains('`');
+
+            if !has_active_styles && !text_has_markers {
+                return false;
+            }
+        }
+
         self.temp_markdown_buf.clear();
         self.blocks[block_idx].write_markdown_to(&mut self.temp_markdown_buf);
         let text = &self.temp_markdown_buf;

@@ -70,7 +70,21 @@ impl<'a> EditorView<'a> {
 
         let mut list_counters: Vec<u32> = vec![0; 10];
 
-        for i in 0..start_block_idx {
+        // Optimization: Find the start of the current list "cluster" to avoid O(N) iteration from the beginning of the document.
+        let mut scan_start_idx = 0;
+        if start_block_idx > 0 {
+            let mut i = start_block_idx;
+            while i > 0 {
+                let block = &params.doc.blocks[i - 1];
+                if block.ty != BlockType::OrderedListItem && block.ty != BlockType::ListItem {
+                    scan_start_idx = i;
+                    break;
+                }
+                i -= 1;
+            }
+        }
+
+        for i in scan_start_idx..start_block_idx {
             let block = &params.doc.blocks[i];
             if block.ty != BlockType::OrderedListItem && block.ty != BlockType::ListItem {
                 list_counters.fill(0);
@@ -319,20 +333,22 @@ impl<'a> EditorView<'a> {
                         }
                     }
 
-                    if let Some(pos) = params.finger_hit {
-                        let r = Rect {
-                            pos: dvec2(current_x, current_y),
-                            size: dvec2(width, height),
-                        };
-                        if r.contains(pos) {
-                            let rel_x = pos.x - current_x;
-                            let avg_char_w = width / span.len as f64;
-                            let local_char = (rel_x / avg_char_w).round() as usize;
-                            let local_char = local_char.min(span.len);
-                            hit_result = Some(HitResult {
-                                block_idx,
-                                char_idx: char_count_so_far + local_char,
-                            });
+                    if hit_result.is_none() {
+                        if let Some(pos) = params.finger_hit {
+                            let r = Rect {
+                                pos: dvec2(current_x, current_y),
+                                size: dvec2(width, height),
+                            };
+                            if r.contains(pos) {
+                                let rel_x = pos.x - current_x;
+                                let avg_char_w = width / span.len as f64;
+                                let local_char = (rel_x / avg_char_w).round() as usize;
+                                let local_char = local_char.min(span.len);
+                                hit_result = Some(HitResult {
+                                    block_idx,
+                                    char_idx: char_count_so_far + local_char,
+                                });
+                            }
                         }
                     }
 
