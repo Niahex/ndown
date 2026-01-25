@@ -63,6 +63,7 @@ impl Document {
                 BlockType::Heading4 => "#### ",
                 BlockType::Heading5 => "##### ",
                 BlockType::Quote => "> ",
+                BlockType::ListItem => "- ",
                 _ => "",
             };
             writer.write_all(prefix.as_bytes())?;
@@ -121,6 +122,13 @@ impl Document {
                 Some(6)
             } else if block.text.starts_with("> ") {
                 block.ty = BlockType::Quote;
+                block.text.replace_range(0..2, "");
+                if let Some(first) = block.styles.first_mut() {
+                    first.len = first.len.saturating_sub(2);
+                }
+                Some(2)
+            } else if block.text.starts_with("- ") {
+                block.ty = BlockType::ListItem;
                 block.text.replace_range(0..2, "");
                 if let Some(first) = block.styles.first_mut() {
                     first.len = first.len.saturating_sub(2);

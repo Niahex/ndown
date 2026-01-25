@@ -83,6 +83,7 @@ impl<'a> EditorView<'a> {
                 BlockType::Heading4 => 19.4,
                 BlockType::Heading5 => 16.9,
                 BlockType::Quote => 24.2,
+                BlockType::ListItem => 21.8,
                 _ => 21.8,
             };
 
@@ -109,6 +110,14 @@ impl<'a> EditorView<'a> {
             }
 
             let mut current_x = start_x;
+
+            if block.ty == BlockType::ListItem {
+                 if current_y >= params.rect.pos.y && current_y < params.rect.pos.y + params.rect.size.y {
+                     self.draw_text_reg.draw_abs(cx, dvec2(current_x, current_y), "• ");
+                 }
+                 current_x += 15.0; 
+            }
+
             let mut max_h_calc = 0.0;
             let mut char_count_so_far = 0;
             let mut found_cursor = false;

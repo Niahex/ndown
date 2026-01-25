@@ -9,6 +9,7 @@ pub enum BlockType {
     Heading4,
     Heading5,
     Quote,
+    ListItem,
     CodeBlock,
 }
 

@@ -398,8 +398,24 @@ impl Widget for EditorArea {
                     }
                     KeyCode::ReturnKey => {
                         self.selection_anchor = None;
-                        let new_block =
-                            Block::new(self.document.generate_id(), BlockType::Paragraph, "");
+                        let current_ty = self.document.blocks[self.cursor_block].ty.clone();
+                        let current_len = self.document.blocks[self.cursor_block].text_len();
+                        
+                        // Exit list if empty item
+                        if current_ty == BlockType::ListItem && current_len == 0 {
+                            self.document.blocks[self.cursor_block].ty = BlockType::Paragraph;
+                            self.invalidate_layout();
+                            self.redraw(cx);
+                            return;
+                        }
+
+                        let new_ty = if current_ty == BlockType::ListItem {
+                            BlockType::ListItem
+                        } else {
+                            BlockType::Paragraph
+                        };
+                        
+                        let new_block = Block::new(self.document.generate_id(), new_ty, "");
                         self.document
                             .blocks
                             .insert(self.cursor_block + 1, new_block);

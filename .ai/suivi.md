@@ -127,21 +127,22 @@
   - Ctrl+Delete: Supprimer mot suivant
 
 #### Fichier
-- **Ctrl+S**: Sauvegarde asynchrone
+- ✅ **Ctrl+S**: Sauvegarde asynchrone
 
 #### Formatage Automatique
-- **Ctrl+B**: Gras (Exclusif : Remplace Italique/Code)
-- **Ctrl+I**: Italique (Exclusif : Remplace Gras/Code)
-- Typing `# ` → Heading1
-- Typing `## ` → Heading2
-- Typing `### ` → Heading3
-- Typing `#### ` → Heading4
-- Typing `##### ` → Heading5
-- Typing `> ` → Quote
-- Typing `**texte**` → Gras
-- Typing `*texte*` → Italique
-- Typing `` `code` `` → Code inline (Fond grisé + Police monospace)
-- Sélection + `*` ou `**` ou `` ` `` → Wrap automatique
+- ✅ **Ctrl+B**: Gras (Exclusif : Remplace Italique/Code)
+- ✅ **Ctrl+I**: Italique (Exclusif : Remplace Gras/Code)
+- ✅ Typing `# ` → Heading1
+- ✅ Typing `## ` → Heading2
+- ✅ Typing `### ` → Heading3
+- ✅ Typing `#### ` → Heading4
+- ✅ Typing `##### ` → Heading5
+- ✅ Typing `> ` → Quote
+- ✅ Typing `- ` → Liste à puces (Entrée pour nouvelle puce, Entrée sur vide pour sortir)
+- ✅ Typing `**texte**` → Gras
+- ✅ Typing `*texte*` → Italique
+- ✅ Typing `` `code` `` → Code inline (Fond grisé + Police monospace)
+- ✅ Sélection + `*` ou `**` ou `` ` `` → Wrap automatique
 
 ---
 
