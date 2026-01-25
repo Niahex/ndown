@@ -1,10 +1,12 @@
 use makepad_widgets::*;
 use std::fs;
 use std::path::PathBuf;
+use crate::TOKIO_RUNTIME;
 
 #[derive(Clone, DefaultNone, Debug)]
 pub enum FileExplorerAction {
     FileSelected(String),
+    AsyncFilesLoaded(Vec<String>),
     None,
 }
 
@@ -77,24 +79,27 @@ pub struct FileExplorer {
 
 impl LiveHook for FileExplorer {
     fn after_new_from_doc(&mut self, _cx: &mut Cx) {
-        self.load_files();
+        self.load_files_async();
     }
 }
 
 impl FileExplorer {
-    fn load_files(&mut self) {
-        let path = std::env::current_dir().unwrap_or(PathBuf::from("."));
-        self.files.clear();
+    fn load_files_async(&mut self) {
+        TOKIO_RUNTIME.spawn(async move {
+            let path = std::env::current_dir().unwrap_or(PathBuf::from("."));
+            let mut files = Vec::new();
 
-        if let Ok(entries) = fs::read_dir(path) {
-            for entry in entries.flatten() {
-                let name = entry.file_name().to_string_lossy().into_owned();
-                if !name.starts_with('.') {
-                    self.files.push(name);
+            if let Ok(entries) = fs::read_dir(path) {
+                for entry in entries.flatten() {
+                    let name = entry.file_name().to_string_lossy().into_owned();
+                    if !name.starts_with('.') {
+                        files.push(name);
+                    }
                 }
             }
-        }
-        self.files.sort();
+            files.sort();
+            Cx::post_action(FileExplorerAction::AsyncFilesLoaded(files));
+        });
     }
 
     pub fn handle_file_actions(&self, _cx: &mut Cx, actions: &Actions) -> Option<String> {
@@ -111,6 +116,19 @@ impl FileExplorer {
 impl Widget for FileExplorer {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
         self.view.handle_event(cx, event, scope);
+
+        if let Event::Actions(actions) = event {
+            for action in actions {
+                let fe_action = action.as_widget_action().cast::<FileExplorerAction>();
+                match fe_action {
+                    FileExplorerAction::AsyncFilesLoaded(files) => {
+                        self.files = files;
+                        self.redraw(cx);
+                    }
+                    _ => {}
+                }
+            }
+        }
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
