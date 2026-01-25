@@ -125,8 +125,8 @@
   - Supprimer caractère suivant
   - Fusionner avec bloc suivant si fin de bloc
   - Ctrl+Delete: Supprimer mot suivant
-- ✅ **Copier/Couper**: Via presse-papier système (Support Wayland renforcé)
-- ✅ **Coller**: Via presse-papier système (Support multiligne)
+- ✅ **Copier/Couper**: Via `arboard` (ou `cx.copy` en fallback)
+- ✅ **Coller**: Via `arboard` (Support multiligne robuste)
 
 #### Fichier
 - ✅ **Ctrl+S**: Sauvegarde asynchrone

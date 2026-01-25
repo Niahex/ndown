@@ -352,7 +352,11 @@ impl Widget for EditorArea {
                 if ctrl && ke.key_code == KeyCode::KeyC {
                     if let Some((start, end)) = self.get_selection_range() {
                         let text = self.document.get_text_in_range(start, end);
-                        cx.copy_to_clipboard(&text);
+                        if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                            let _ = clipboard.set_text(text);
+                        } else {
+                            cx.copy_to_clipboard(&text);
+                        }
                     }
                     return;
                 }
@@ -360,13 +364,72 @@ impl Widget for EditorArea {
                 if ctrl && ke.key_code == KeyCode::KeyX {
                     if let Some((start, end)) = self.get_selection_range() {
                         let text = self.document.get_text_in_range(start, end);
-                        cx.copy_to_clipboard(&text);
+                        if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                            let _ = clipboard.set_text(text);
+                        } else {
+                            cx.copy_to_clipboard(&text);
+                        }
                         self.document.delete_range(start, end);
                         self.cursor_block = start.0;
                         self.cursor_char = start.1;
                         self.selection_anchor = None;
                         self.invalidate_layout();
                         self.redraw(cx);
+                    }
+                    return;
+                }
+
+                if ctrl && ke.key_code == KeyCode::KeyV {
+                    let text_opt = if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                        clipboard.get_text().ok()
+                    } else {
+                        None
+                    };
+
+                    if let Some(text) = text_opt {
+                        if !text.is_empty() {
+                             if let Some((start, end)) = self.get_selection_range() {
+                                self.document.delete_range(start, end);
+                                self.cursor_block = start.0;
+                                self.cursor_char = start.1;
+                                self.selection_anchor = None;
+                            }
+                            
+                            // Remove carriage returns
+                            let text = text.replace("\r\n", "\n").replace('\r', "\n");
+                            
+                            let mut parts = text.split('\n');
+                            if let Some(first) = parts.next() {
+                                let added = self.document.insert_text_at(self.cursor_block, self.cursor_char, first);
+                                self.cursor_char += added;
+                            }
+                            
+                            for part in parts {
+                                // Split block at cursor
+                                let current_block = &mut self.document.blocks[self.cursor_block];
+                                let rest_text: String = current_block.text.chars().skip(self.cursor_char).collect();
+                                let rest_len = rest_text.chars().count();
+                                
+                                // Truncate current block
+                                let current_len = current_block.text_len();
+                                for _ in 0..rest_len {
+                                    self.document.remove_char_at(self.cursor_block, current_len - rest_len);
+                                }
+                                
+                                // Create new block with rest
+                                let mut new_block = Block::new(self.document.generate_id(), BlockType::Paragraph, &rest_text);
+                                
+                                self.document.blocks.insert(self.cursor_block + 1, new_block);
+                                self.cursor_block += 1;
+                                self.cursor_char = 0;
+                                
+                                let added = self.document.insert_text_at(self.cursor_block, 0, part);
+                                self.cursor_char += added;
+                            }
+                            
+                            self.invalidate_layout();
+                            self.redraw(cx);
+                        }
                     }
                     return;
                 }
