@@ -601,4 +601,43 @@ impl Document {
             block.styles.insert(i + 1, span2);
         }
     }
+
+    pub fn get_text_in_range(&self, start: (usize, usize), end: (usize, usize)) -> String {
+        let (start_blk, start_char) = start;
+        let (end_blk, end_char) = end;
+        
+        if start_blk == end_blk {
+            let text = &self.blocks[start_blk].text;
+            let chars: Vec<char> = text.chars().collect();
+            if start_char < chars.len() && end_char <= chars.len() {
+                return chars[start_char..end_char].iter().collect();
+            }
+            return String::new();
+        }
+        
+        let mut result = String::new();
+        
+        // First block
+        let text = &self.blocks[start_blk].text;
+        let chars: Vec<char> = text.chars().collect();
+        if start_char < chars.len() {
+            result.push_str(&chars[start_char..].iter().collect::<String>());
+        }
+        result.push('\n');
+        
+        // Middle blocks
+        for i in start_blk + 1..end_blk {
+            result.push_str(&self.blocks[i].text);
+            result.push('\n');
+        }
+        
+        // Last block
+        let text = &self.blocks[end_blk].text;
+        let chars: Vec<char> = text.chars().collect();
+        if end_char <= chars.len() {
+            result.push_str(&chars[..end_char].iter().collect::<String>());
+        }
+        
+        result
+    }
 }

@@ -304,6 +304,30 @@ impl Widget for EditorArea {
                 self.redraw(cx);
             }
 
+            Hit::TextCopy(e) => {
+                if let Some((start, end)) = self.get_selection_range() {
+                    let text = self.document.get_text_in_range(start, end);
+                    *e.response.borrow_mut() = Some(text);
+                } else {
+                    *e.response.borrow_mut() = None;
+                }
+            }
+
+            Hit::TextCut(e) => {
+                if let Some((start, end)) = self.get_selection_range() {
+                    let text = self.document.get_text_in_range(start, end);
+                    *e.response.borrow_mut() = Some(text);
+                    self.document.delete_range(start, end);
+                    self.cursor_block = start.0;
+                    self.cursor_char = start.1;
+                    self.selection_anchor = None;
+                    self.invalidate_layout();
+                    self.redraw(cx);
+                } else {
+                    *e.response.borrow_mut() = None;
+                }
+            }
+
             Hit::KeyDown(ke) => {
                 self.reset_blink(cx);
                 let shift = ke.modifiers.shift;
@@ -322,6 +346,28 @@ impl Widget for EditorArea {
                     self.selection_anchor = Some((self.cursor_block, 0));
                     self.cursor_char = self.document.blocks[self.cursor_block].text_len();
                     self.redraw(cx);
+                    return;
+                }
+
+                if ctrl && ke.key_code == KeyCode::KeyC {
+                    if let Some((start, end)) = self.get_selection_range() {
+                        let text = self.document.get_text_in_range(start, end);
+                        cx.copy_to_clipboard(&text);
+                    }
+                    return;
+                }
+
+                if ctrl && ke.key_code == KeyCode::KeyX {
+                    if let Some((start, end)) = self.get_selection_range() {
+                        let text = self.document.get_text_in_range(start, end);
+                        cx.copy_to_clipboard(&text);
+                        self.document.delete_range(start, end);
+                        self.cursor_block = start.0;
+                        self.cursor_char = start.1;
+                        self.selection_anchor = None;
+                        self.invalidate_layout();
+                        self.redraw(cx);
+                    }
                     return;
                 }
 
@@ -565,7 +611,12 @@ impl Widget for EditorArea {
                 self.redraw(cx);
             }
             Hit::TextInput(te) => {
-                if !te.input.is_empty() && !te.input.chars().any(|c| c.is_control()) {
+                let is_valid_input = !te.input.chars().any(|c| c.is_control()) 
+                                     || te.input.contains('\n') 
+                                     || te.input.contains('\r')
+                                     || te.input.contains('\t');
+
+                if !te.input.is_empty() && is_valid_input {
                     let mut wrapped = false;
                     if let Some(((start_blk, start_char), (end_blk, end_char))) =
                         self.get_selection_range()
