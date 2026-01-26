@@ -178,7 +178,12 @@ impl<'a> EditorView<'a> {
             let mut current_x = start_x;
 
             if block.ty == BlockType::CodeBlock {
-                let bg_h = if use_cached_layout { block_height } else { base_height_fallback + 42.0 };
+                let bg_h = if use_cached_layout { 
+                    block_height 
+                } else {
+                    let text_layout = self.draw_text_code.layout(cx, 0.0, 0.0, None, false, Align::default(), &block.text);
+                    text_layout.size_in_lpxs.height as f64 + 42.0
+                };
                 self.draw_code_bg.draw_abs(cx, Rect {
                     pos: dvec2(start_x, current_y),
                     size: dvec2(params.rect.size.x - params.layout.padding.left - params.layout.padding.right, bg_h)
