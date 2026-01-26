@@ -523,7 +523,7 @@ impl Widget for EditorArea {
                 }
 
                 if ctrl && (ke.key_code == KeyCode::KeyB || ke.key_code == KeyCode::KeyI) {
-                    let marker = if ke.key_code == KeyCode::KeyB { "**" } else { "*" };
+                    let style_type = if ke.key_code == KeyCode::KeyB { 0 } else { 1 }; // 0=bold, 1=italic
                     
                     makepad_widgets::log!("Ctrl+{} pressed, selection_anchor: {:?}, cursor: ({}, {})", 
                         if ke.key_code == KeyCode::KeyB { "B" } else { "I" },
@@ -537,22 +537,17 @@ impl Widget for EditorArea {
                     {
                         makepad_widgets::log!("Selection range: ({}, {}) to ({}, {})", start_blk, start_char, end_blk, end_char);
                         if start_blk == end_blk {
-                            let selected_text = self.document.get_text_in_range((start_blk, start_char), (end_blk, end_char));
-                            // Insert closing marker first (at end)
-                            self.document.insert_text_at(start_blk, end_char, marker);
-                            // Then opening marker (at start)
-                            self.document.insert_text_at(start_blk, start_char, marker);
-                            // Apply formatting to parse the markers
-                            let applied = self.document.apply_inline_formatting(start_blk);
+                            // Use toggle_formatting instead of inserting markers
+                            self.document.toggle_formatting(start_blk, start_char, end_char, style_type);
+                            
                             let result_text = self.document.blocks[start_blk].full_text();
-                            makepad_widgets::log!("Ctrl+{}: '{}' -> '{}' (parsed: {})", 
+                            makepad_widgets::log!("Ctrl+{}: toggled {} on selection", 
                                 if ke.key_code == KeyCode::KeyB { "B" } else { "I" },
-                                selected_text.escape_debug(), 
-                                format!("{}{}{}", marker, selected_text, marker).escape_debug(),
-                                if applied { "yes" } else { "no" }
+                                if style_type == 0 { "bold" } else { "italic" }
                             );
                             makepad_widgets::log!("Block text after: '{}'", result_text.escape_debug());
                             makepad_widgets::log!("Block styles: {:?}", self.document.blocks[start_blk].styles);
+                            
                             // Clear selection
                             self.selection_anchor = None;
                             // Invalidate layout to refresh display
@@ -563,6 +558,7 @@ impl Widget for EditorArea {
                     } else {
                         makepad_widgets::log!("No selection detected");
                         // No selection: insert markers and position cursor between them
+                        let marker = if ke.key_code == KeyCode::KeyB { "**" } else { "*" };
                         let insert_text = format!("{}{}", marker, marker);
                         self.document.insert_text_at(
                             self.cursor_block,
