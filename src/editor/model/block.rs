@@ -100,9 +100,6 @@ impl Block {
     // Version Streaming I/O (Zero allocation for big strings)
     pub fn write_markdown_to_writer<W: Write>(&self, w: &mut W) -> io::Result<()> {
         let mut char_iter = self.text.chars();
-        // Buffer local pour éviter trop d'appels à write (optionnel si BufWriter est utilisé au dessus)
-        // Mais BufWriter est byte-based, ici on manipule des chars/strings.
-        // On écrit direct les slices.
 
         for span in &self.styles {
             if span.style.is_code {
@@ -114,20 +111,6 @@ impl Block {
             if span.style.is_italic {
                 w.write_all(b"*")?;
             }
-
-            // Pour le texte, on ne peut pas faire write_all direct car on doit découper par span
-            // et text est utf8.
-            // On doit extraire la sous-chaîne correspondante.
-            // Pas de zero-copy facile ici sans indices de bytes.
-            // On va reconstruire une petite string temporaire ou écrire char par char.
-            // Écrire char par char dans un BufWriter est très efficace.
-
-            // Option plus rapide : trouver les byte indices et écrire le slice.
-            // Comme on itère séquentiellement, on peut garder un byte offset.
-            // C'est ce qu'on va faire pour l'optimisation ultime.
-
-            // MAIS wait, char_iter consomme. On ne peut pas facilement mapper char -> byte index sans re-parcourir.
-            // On va écrire char par char dans un petit buffer stack (encode_utf8).
 
             let mut b = [0; 4]; // Max utf8 char len
             for _ in 0..span.len {
