@@ -235,6 +235,8 @@ impl<'a> EditorView<'a> {
             let mut char_count_so_far = 0;
             let mut found_cursor = false;
             let mut cursor_x_final = current_x;
+            let mut cursor_y_final = current_y;
+            let mut cursor_h_final = 20.0;
 
             let mut char_iter = block.text.chars();
             let mut current_byte_offset = 0;
@@ -407,31 +409,31 @@ impl<'a> EditorView<'a> {
                         && params.cursor.1 <= char_count_so_far + span.len
                     {
                         let local_idx = params.cursor.1 - char_count_so_far;
+                        
+                        let single_line_layout = draw_text.layout(cx, 0.0, 0.0, None, false, Align::default(), "A");
+                        cursor_h_final = if single_line_layout.size_in_lpxs.height > 0.0 {
+                            single_line_layout.size_in_lpxs.height as f64
+                        } else {
+                            20.0
+                        };
+
                         if local_idx == 0 {
                             cursor_x_final = current_x;
-                        } else if local_idx == span.len {
-                            cursor_x_final = current_x + width;
+                            cursor_y_final = current_y;
                         } else {
-                            // Optimization: Slice
                             let mut byte_len_sub = 0;
-                            for (i, c) in span_text.chars().enumerate() {
-                                if i < local_idx {
-                                    byte_len_sub += c.len_utf8();
-                                } else {
-                                    break;
-                                }
+                            for (i, c) in span_text.chars().enumerate().take(local_idx) {
+                                byte_len_sub += c.len_utf8();
                             }
                             let sub_text = &span_text[0..byte_len_sub];
-                            let sub_layout = draw_text.layout(
-                                cx,
-                                0.0,
-                                0.0,
-                                None,
-                                false,
-                                Align::default(),
-                                sub_text,
-                            );
-                            cursor_x_final = current_x + sub_layout.size_in_lpxs.width as f64;
+                            let lines: Vec<&str> = sub_text.split('\n').collect();
+                            let line_count = lines.len().saturating_sub(1);
+                            let last_line = lines.last().cloned().unwrap_or("");
+                            
+                            let last_line_layout = draw_text.layout(cx, 0.0, 0.0, None, false, Align::default(), last_line);
+                            
+                            cursor_x_final = current_x + last_line_layout.size_in_lpxs.width as f64;
+                            cursor_y_final = current_y + (line_count as f64 * cursor_h_final);
                         }
                         found_cursor = true;
                     }
@@ -464,14 +466,14 @@ impl<'a> EditorView<'a> {
                 if !found_cursor && params.cursor.1 == char_count_so_far {
                     cursor_x_final = current_x;
                 }
-                if current_y + final_height >= params.rect.pos.y
-                    && current_y < params.rect.pos.y + params.rect.size.y
+                if cursor_y_final + cursor_h_final >= params.rect.pos.y
+                    && cursor_y_final < params.rect.pos.y + params.rect.size.y
                 {
                     self.draw_cursor.draw_abs(
                         cx,
                         Rect {
-                            pos: dvec2(cursor_x_final, current_y),
-                            size: dvec2(2.0, final_height),
+                            pos: dvec2(cursor_x_final, cursor_y_final),
+                            size: dvec2(2.0, cursor_h_final),
                         },
                     );
                 }
