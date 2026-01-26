@@ -156,6 +156,8 @@ pub struct EditorArea {
     last_rendered_width: f64,
     #[rust]
     current_file: Option<String>,
+    #[rust]
+    ignore_next_text_input: bool,
 }
 
 impl LiveHook for EditorArea {
@@ -194,7 +196,7 @@ impl EditorArea {
         }
         let block = &self.document.blocks[self.cursor_block];
         let text = block.full_text();
-        
+
         // Skip whitespace backwards
         let mut i = self.cursor_char;
         while i > 0 {
@@ -205,7 +207,7 @@ impl EditorArea {
             }
             i -= 1;
         }
-        
+
         // Skip non-whitespace backwards
         while i > 0 {
              if let Some(c) = text.chars().nth(i - 1) {
@@ -223,7 +225,7 @@ impl EditorArea {
         let text = block.full_text();
         let len = block.text_len();
         let mut i = self.cursor_char;
-        
+
         // Skip whitespace forwards
         while i < len {
             if let Some(c) = text.chars().nth(i) {
@@ -233,7 +235,7 @@ impl EditorArea {
             }
              i += 1;
         }
-        
+
         // Skip non-whitespace forwards
         while i < len {
              if let Some(c) = text.chars().nth(i) {
@@ -259,14 +261,14 @@ impl EditorArea {
     pub fn load_file_async(&mut self, _cx: &mut Cx, filename: String) {
         let filename_clone = filename.clone();
         self.current_file = Some(filename.clone());
-        
+
         TOKIO_RUNTIME.spawn(async move {
             use std::io::BufRead;
             if let Ok(file) = std::fs::File::open(&filename_clone) {
                 let reader = std::io::BufReader::new(file);
                 let mut new_blocks = Vec::with_capacity(1024);
                 let mut id_gen = 1000;
-                
+
                 for line_res in reader.lines() {
                     if let Ok(line) = line_res {
                         let ty = if line.starts_with("# ") {
@@ -397,7 +399,7 @@ impl Widget for EditorArea {
                 if ctrl && ke.key_code == KeyCode::KeyS {
                     let doc_snapshot = self.document.snapshot();
                     let filename = self.current_file.clone().unwrap_or_else(|| "story.md".to_string());
-                    
+
                     TOKIO_RUNTIME.spawn(async move {
                         match doc_snapshot.save_to_file(&filename) {
                             Ok(_) => {
@@ -523,20 +525,43 @@ impl Widget for EditorArea {
                 if ctrl && (ke.key_code == KeyCode::KeyB || ke.key_code == KeyCode::KeyI) {
                     let marker = if ke.key_code == KeyCode::KeyB { "**" } else { "*" };
                     
+                    makepad_widgets::log!("Ctrl+{} pressed, selection_anchor: {:?}, cursor: ({}, {})", 
+                        if ke.key_code == KeyCode::KeyB { "B" } else { "I" },
+                        self.selection_anchor,
+                        self.cursor_block,
+                        self.cursor_char
+                    );
+
                     if let Some(((start_blk, start_char), (end_blk, end_char))) =
                         self.get_selection_range()
                     {
+                        makepad_widgets::log!("Selection range: ({}, {}) to ({}, {})", start_blk, start_char, end_blk, end_char);
                         if start_blk == end_blk {
+                            let selected_text = self.document.get_text_in_range((start_blk, start_char), (end_blk, end_char));
                             // Insert closing marker first (at end)
                             self.document.insert_text_at(start_blk, end_char, marker);
                             // Then opening marker (at start)
                             self.document.insert_text_at(start_blk, start_char, marker);
                             // Apply formatting to parse the markers
-                            self.document.apply_inline_formatting(start_blk);
+                            let applied = self.document.apply_inline_formatting(start_blk);
+                            let result_text = self.document.blocks[start_blk].full_text();
+                            makepad_widgets::log!("Ctrl+{}: '{}' -> '{}' (parsed: {})", 
+                                if ke.key_code == KeyCode::KeyB { "B" } else { "I" },
+                                selected_text.escape_debug(), 
+                                format!("{}{}{}", marker, selected_text, marker).escape_debug(),
+                                if applied { "yes" } else { "no" }
+                            );
+                            makepad_widgets::log!("Block text after: '{}'", result_text.escape_debug());
+                            makepad_widgets::log!("Block styles: {:?}", self.document.blocks[start_blk].styles);
                             // Clear selection
                             self.selection_anchor = None;
+                            // Invalidate layout to refresh display
+                            self.invalidate_layout_from(start_blk);
+                            // Ignore the TextInput event that follows
+                            self.ignore_next_text_input = true;
                         }
                     } else {
+                        makepad_widgets::log!("No selection detected");
                         // No selection: insert markers and position cursor between them
                         let insert_text = format!("{}{}", marker, marker);
                         self.document.insert_text_at(
@@ -545,6 +570,11 @@ impl Widget for EditorArea {
                             &insert_text,
                         );
                         self.cursor_char += marker.len();
+                        makepad_widgets::log!("Ctrl+{}: Inserted '{}' (cursor between markers)", 
+                            if ke.key_code == KeyCode::KeyB { "B" } else { "I" },
+                            insert_text
+                        );
+                        self.ignore_next_text_input = true;
                     }
                     self.redraw(cx);
                     return;
@@ -789,6 +819,19 @@ impl Widget for EditorArea {
                 self.redraw(cx);
             }
             Hit::TextInput(te) => {
+                
+                // Ignore TextInput if flag is set (e.g., after Ctrl+B/I)
+                if self.ignore_next_text_input {
+                    self.ignore_next_text_input = false;
+                    return;
+                }
+                
+                // Ignore Tab input when there's a selection (likely from Ctrl+I)
+                if te.input == "\t" && self.selection_anchor.is_some() {
+                    makepad_widgets::log!("Ignoring Tab input with active selection");
+                    return;
+                }
+                
                 let is_valid_input = !te.input.chars().any(|c| c.is_control())
                     || te.input.contains('\n')
                     || te.input.contains('\r')
