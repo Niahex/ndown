@@ -106,7 +106,14 @@ impl Document {
         let block = &mut self.blocks[block_idx];
 
         let removed = if block.ty == BlockType::Paragraph {
-            if block.text.starts_with("# ") {
+            if block.text.starts_with("```") {
+                block.ty = BlockType::CodeBlock;
+                block.text.replace_range(0..3, "");
+                if let Some(first) = block.styles.first_mut() {
+                    first.len = first.len.saturating_sub(3);
+                }
+                Some(3)
+            } else if block.text.starts_with("# ") {
                 block.ty = BlockType::Heading1;
                 block.text.replace_range(0..2, "");
                 if let Some(first) = block.styles.first_mut() {
@@ -197,6 +204,19 @@ impl Document {
         } else {
             None
         };
+
+        // Handle closing code block
+        if block.ty == BlockType::CodeBlock {
+            if block.text.starts_with("```") {
+                block.ty = BlockType::Paragraph;
+                block.text.replace_range(0..3, "");
+                if let Some(first) = block.styles.first_mut() {
+                    first.len = first.len.saturating_sub(3);
+                }
+                block.mark_dirty();
+                return Some(3);
+            }
+        }
 
         if removed.is_some() {
             block.mark_dirty();

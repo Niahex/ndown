@@ -28,6 +28,7 @@ impl EditorAreaRef {
 live_design! {
     use link::theme::*;
     use link::widgets::*;
+    use makepad_draw::shader::std::*;
     use crate::theme::*;
 
     pub EditorArea = {{EditorArea}}{
@@ -51,7 +52,23 @@ live_design! {
 
         draw_cursor: { color: #ffffff }
         draw_selection: { color: (NORD_POLAR_3) }
-        draw_code_bg: { color: (NORD_POLAR_2) }
+        draw_code_bg: { 
+            color: (NORD_POLAR_2)
+            instance border_radius: 4.0
+            fn pixel(self) -> vec4 {
+                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+                sdf.box(
+                    2.0,
+                    2.0,
+                    self.rect_size.x - 4.0,
+                    self.rect_size.y - 4.0,
+                    self.border_radius
+                );
+                sdf.fill(self.color);
+                return sdf.result;
+            }
+        }
+        draw_text_code_header: { text_style: <THEME_FONT_REGULAR> { font_size: 9.0 }, color: (NORD_SNOW_0) }
 
         animator: {
             blink = {
@@ -98,6 +115,8 @@ pub struct EditorArea {
     draw_selection: DrawColor,
     #[live]
     draw_code_bg: DrawColor,
+    #[live]
+    draw_text_code_header: DrawText,
 
     #[animator]
     animator: Animator,
@@ -628,6 +647,15 @@ impl Widget for EditorArea {
                         let current_ty = self.document.blocks[self.cursor_block].ty.clone();
                         let current_len = self.document.blocks[self.cursor_block].text_len();
 
+                        // Shift + Return in CodeBlock inserts a newline
+                        if current_ty == BlockType::CodeBlock && shift {
+                            self.document.insert_text_at(self.cursor_block, self.cursor_char, "\n");
+                            self.cursor_char += 1;
+                            self.invalidate_layout_from(self.cursor_block);
+                            self.redraw(cx);
+                            return;
+                        }
+
                         // Exit list if empty item
                         if (current_ty == BlockType::ListItem
                             || current_ty == BlockType::OrderedListItem)
@@ -654,6 +682,7 @@ impl Widget for EditorArea {
                                 self.document.blocks[self.cursor_block].indent,
                             )
                         } else {
+                            // Default to Paragraph for new blocks (including after CodeBlock)
                             (BlockType::Paragraph, 0)
                         };
 
@@ -927,6 +956,7 @@ impl Widget for EditorArea {
             draw_cursor: &mut self.draw_cursor,
             draw_selection: &mut self.draw_selection,
             draw_code_bg: &mut self.draw_code_bg,
+            draw_text_code_header: &mut self.draw_text_code_header,
         };
 
         let is_cache_valid = !self.block_y_offsets.is_empty()
