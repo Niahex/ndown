@@ -178,17 +178,17 @@ impl<'a> EditorView<'a> {
             let mut current_x = start_x;
 
             if block.ty == BlockType::CodeBlock {
-                let bg_h = if use_cached_layout { block_height } else { base_height_fallback + 20.0 };
+                let bg_h = if use_cached_layout { block_height } else { base_height_fallback + 42.0 };
                 self.draw_code_bg.draw_abs(cx, Rect {
                     pos: dvec2(start_x, current_y),
                     size: dvec2(params.rect.size.x - params.layout.padding.left - params.layout.padding.right, bg_h)
                 });
                 
                 // Draw header
-                self.draw_text_code_header.draw_abs(cx, dvec2(start_x + 10.0, current_y + 4.0), "language");
+                self.draw_text_code_header.draw_abs(cx, dvec2(start_x + 10.0, current_y + 5.0), "language");
                 
-                current_y += 20.0; // Space for header
-                current_x += 10.0; // Left padding for code
+                current_y += 32.0; // Space for header (22) + top margin (10)
+                current_x += 15.0; // Left margin
             }
 
             if block.ty != BlockType::OrderedListItem && block.ty != BlockType::ListItem {
@@ -449,7 +449,7 @@ impl<'a> EditorView<'a> {
             };
 
             let final_height = if block.ty == BlockType::CodeBlock {
-                base_calc_height + 20.0 + 5.0 // header + bottom padding
+                base_calc_height + 42.0 // header (22) + top margin (10) + bottom margin (10)
             } else {
                 base_calc_height
             };
