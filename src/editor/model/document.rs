@@ -225,6 +225,7 @@ impl Document {
         self.temp_markdown_buf.clear();
         self.blocks[block_idx].write_markdown_to(&mut self.temp_markdown_buf);
         let text = &self.temp_markdown_buf;
+        log::info!("apply_inline_formatting: text = '{}'", text);
 
         if !text.contains('*') && !text.contains('`') {
             return false;
@@ -307,14 +308,8 @@ impl Document {
                     i += 2;
                     changed = true;
                     continue;
-                } else {
-                    // Not a valid bold pair, treat as literal ** to prevent Italic check from matching
-                    new_text.push('*');
-                    new_text.push('*');
-                    pending_len += 2;
-                    i += 2;
-                    continue;
                 }
+                // If not valid bold, fall through to check single * for italic
             }
 
             if !is_code && chars[i] == '*' {
@@ -323,10 +318,6 @@ impl Document {
                     let mut k = i + 1;
                     while k < len {
                         if chars[k] == '*' {
-                            if k + 1 < len && chars[k + 1] == '*' {
-                                k += 2;
-                                continue;
-                            }
                             has_closing = true;
                             break;
                         }
@@ -354,6 +345,7 @@ impl Document {
         push_segment(pending_len, is_bold, is_italic, is_code);
 
         if changed {
+            log::info!("Result: new_text = '{}', is_bold={}, is_italic={}", new_text, new_styles.iter().any(|s| s.style.is_bold), new_styles.iter().any(|s| s.style.is_italic));
             let block = &mut self.blocks[block_idx];
             block.text = new_text;
             block.styles = new_styles;
@@ -747,5 +739,45 @@ impl Document {
         }
 
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_apply_inline_formatting_italic() {
+        let mut doc = Document::default();
+        doc.blocks[0].text = "*text*".to_string();
+        doc.blocks[0].styles.clear();
+        doc.blocks[0].styles.push(StyleSpan {
+            len: 6,
+            style: StyleBits::default(),
+        });
+
+        let changed = doc.apply_inline_formatting(0);
+        
+        assert!(changed);
+        assert_eq!(doc.blocks[0].text, "text"); // Expect markers stripped?
+        assert!(doc.blocks[0].styles[0].style.is_italic);
+    }
+
+    #[test]
+    fn test_toggle_formatting_italic() {
+        let mut doc = Document::default();
+        doc.blocks[0].text = "text".to_string();
+        doc.blocks[0].styles.clear();
+        doc.blocks[0].styles.push(StyleSpan {
+            len: 4,
+            style: StyleBits::default(),
+        });
+
+        // Toggle Italic on "text"
+        doc.toggle_formatting(0, 0, 4, 1);
+
+        assert_eq!(doc.blocks[0].text, "text");
+        assert!(doc.blocks[0].styles[0].style.is_italic);
+        assert!(!doc.blocks[0].styles[0].style.is_bold);
     }
 }

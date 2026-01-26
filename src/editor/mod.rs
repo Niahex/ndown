@@ -521,32 +521,28 @@ impl Widget for EditorArea {
                 }
 
                 if ctrl && (ke.key_code == KeyCode::KeyB || ke.key_code == KeyCode::KeyI) {
+                    let marker = if ke.key_code == KeyCode::KeyB { "**" } else { "*" };
+                    
                     if let Some(((start_blk, start_char), (end_blk, end_char))) =
                         self.get_selection_range()
                     {
                         if start_blk == end_blk {
-                            let style_type = if ke.key_code == KeyCode::KeyB { 0 } else { 1 };
-                            self.document
-                                .toggle_formatting(start_blk, start_char, end_char, style_type);
-                            // La longueur du texte ne change pas avec toggle_formatting (juste les styles)
-                            // Donc pas besoin de toucher au curseur
-                            // On garde la selection pour pouvoir re-toggeler si besoin
+                            // Insert closing marker first (at end)
+                            self.document.insert_text_at(start_blk, end_char, marker);
+                            // Then opening marker (at start)
+                            self.document.insert_text_at(start_blk, start_char, marker);
+                            // Apply formatting to parse the markers
+                            self.document.apply_inline_formatting(start_blk);
+                            // Clear selection
+                            self.selection_anchor = None;
                         }
                     } else {
-                        let marker = if ke.key_code == KeyCode::KeyB {
-                            "**"
-                        } else {
-                            "*"
-                        };
-                        let insert_text = if ke.key_code == KeyCode::KeyB {
-                            "****"
-                        } else {
-                            "**"
-                        };
+                        // No selection: insert markers and position cursor between them
+                        let insert_text = format!("{}{}", marker, marker);
                         self.document.insert_text_at(
                             self.cursor_block,
                             self.cursor_char,
-                            insert_text,
+                            &insert_text,
                         );
                         self.cursor_char += marker.len();
                     }
